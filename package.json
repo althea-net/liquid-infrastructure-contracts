@@ -1,0 +1,21 @@
+{
+  "name": "althea-contracts",
+  "version": "1.0.0",
+  "description": "Contracts used by Althea",
+  "main": "index.js",
+  "scripts": {
+    "test": "npx hardhat test",
+    "compile": "npx hardhat compile"
+  },
+  "author": "Christian Borst",
+  "license": "ISC",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.2",
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "hardhat": "^2.19.1"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "4.3.1",
+    "ethereum-waffle": "^4.0.10"
+  }
+}
