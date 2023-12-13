@@ -1,14 +1,18 @@
 import chai from "chai";
 
 import { mine } from "@nomicfoundation/hardhat-network-helpers";
-import { deployContracts, deployLiquidERC20, deployLiquidNFT } from "../test-utils";
-import { TestERC20B, TestERC20C, LiquidInfrastructureNFT, LiquidInfrastructureERC20 } from "../typechain-types/contracts";
-import { ERC20 } from "../typechain-types";
-import { LiquidInfrastructureNFT } from "../typechain";
-
+import { ethers } from "hardhat";
+import { deployContracts, deployERC20A, deployLiquidERC20, deployLiquidNFT } from "../test-utils";
+import { TestERC20A, TestERC20B, TestERC20C, LiquidInfrastructureNFT, LiquidInfrastructureERC20 } from "../typechain-types/contracts";
+import { ERC20 } from "../typechain-types/@openzeppelin/contracts/token/ERC20";
+import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+const {
+  loadFixture,
+} = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 const { expect } = chai;
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const ONE_ETH = 1000000000000000000;
 
 // This test makes assertions about the LiquidInfrastructureERC20 contract by running it on hardhat
 //
@@ -16,7 +20,7 @@ const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 // Contract interactions happen via hardhat-ethers: https://hardhat.org/hardhat-runner/plugins/nomiclabs-hardhat-ethers
 // Chai is used to make assertions https://www.chaijs.com/api/bdd/
 // Ethereum-waffle is used to extend chai and add ethereum matchers: https://ethereum-waffle.readthedocs.io/en/latest/matchers.html
-async function runTest(opts: {}) {
+async function liquidErc20Fixture() {
   const signers = await ethers.getSigners();
   const nftAccount1 = signers[0];
   const nftAccount2 = signers[1];
@@ -45,33 +49,37 @@ async function runTest(opts: {}) {
   await expect(infraERC20.mint(holder1.address, 1000)).to.be.reverted;
   expect(await infraERC20.balanceOf(holder1.address)).to.equal(0);
 
-  await basicNftManagementTests(infraERC20, nftAccount1, nftAccount2, badSigner);
-
-  await basicErc20HolderTests(infraERC20, holder1, holder2, badSigner);
-
-  const holders = [holder1, holder2, holder3, holder4];
-  const nftOwners = [nftAccount1, nftAccount2, nftAccount3];
-  const nfts = [await deployLiquidNFT(nftAccount1), await deployLiquidNFT(nftAccount2), await deployLiquidNFT(nftAccount3)];
-  const erc20s: ERC20[] = [testERC20A, testERC20B, testERC20C];
-  for (const nft of nfts) {
-    nft.setThresholds(erc20s, erc20s.map(() => 0));
+  return {
+    infraERC20,
+    testERC20A,
+    testERC20B,
+    testERC20C,
+    signers,
+    nftAccount1,
+    nftAccount2,
+    nftAccount3,
+    erc20Owner,
+    holder1,
+    holder2,
+    holder3,
+    holder4,
+    badSigner
   }
-  await basicDistributionTests(infraERC20, erc20Owner, holders, nftOwners, nfts, erc20s);
 }
 
 // Checks that the owner of the ERC20 is the only one allowed to add ManagedNFTs to the ERC20
 async function basicNftManagementTests(
   infraERC20: LiquidInfrastructureERC20,
-  nftAccount1: ethers.Signer,
-  nftAccount2: ethers.Signer,
-  badSigner: ethers.Signer,
+  nftAccount1: HardhatEthersSigner,
+  nftAccount2: HardhatEthersSigner,
+  badSigner: HardhatEthersSigner,
 ) {
   // Deploy several LiquidInfrastructureNFTs to test the NFT management features
   //////////////////
   const infraERC20NotOwner = infraERC20.connect(badSigner);
-  const NFT1 = await deployLiquidNFT(nftAccount1.address);
+  const NFT1 = await deployLiquidNFT(nftAccount1);
   const NFT1NotOwner = NFT1.connect(badSigner);
-  const NFT2 = await deployLiquidNFT(nftAccount2.address);
+  const NFT2 = await deployLiquidNFT(nftAccount2);
 
   console.log("Manage");
   await transferNftToErc20AndManage(infraERC20, NFT1, nftAccount1);
@@ -90,7 +98,7 @@ async function basicNftManagementTests(
 async function transferNftToErc20AndManage(
   infraERC20: LiquidInfrastructureERC20,
   nftToManage: LiquidInfrastructureNFT,
-  nftOwner: string,
+  nftOwner: HardhatEthersSigner,
 ) {
   const infraAddress = await infraERC20.getAddress();
   const accountId = await nftToManage.AccountId();
@@ -104,7 +112,7 @@ async function transferNftToErc20AndManage(
 async function failToManageNFTBadSigner(
   infraERC20BadSigner: LiquidInfrastructureERC20,
   nftToManage: LiquidInfrastructureNFT,
-  nftOwner: string,
+  nftOwner: HardhatEthersSigner,
 ) {
   const infraAddress = await infraERC20BadSigner.getAddress();
   const nftAddress = await nftToManage.getAddress();
@@ -129,9 +137,9 @@ async function failToManageNFTNotOwner(infraERC20: LiquidInfrastructureERC20, nf
 // and that even the owner cannot give them tokens without approving them
 async function basicErc20HolderTests(
   infraERC20: LiquidInfrastructureERC20,
-  holder1: ethers.Signer,
-  holder2: ethers.Signer,
-  badSigner: ethers.Signer,
+  holder1: HardhatEthersSigner,
+  holder2: HardhatEthersSigner,
+  badSigner: HardhatEthersSigner,
 ) {
   const infraERC20NotOwner = infraERC20.connect(badSigner);
   const initialSupply = await infraERC20.totalSupply();
@@ -206,9 +214,9 @@ async function basicErc20HolderTests(
 
 async function basicDistributionTests(
   infraERC20: LiquidInfrastructureERC20,
-  infraERC20Owner: ethers.Signer,
-  holders: ethers.Signer[],
-  nftOwners: ethers.Signer[],
+  infraERC20Owner: HardhatEthersSigner,
+  holders: HardhatEthersSigner[],
+  nftOwners: HardhatEthersSigner[],
   nfts: LiquidInfrastructureNFT[],
   rewardErc20s: ERC20[],
 ) {
@@ -218,20 +226,16 @@ async function basicDistributionTests(
   const [erc20a, erc20b, erc20c] = rewardErc20s.slice(0, 3);
   const erc20Addresses = [await erc20a.getAddress(), await erc20b.getAddress(), await erc20c.getAddress()];
 
-  console.log("Before transfer NFT to ERC20, nft owner: ", await nft1.ownerOf(await nft1.AccountId()));
   // Register one NFT as a source of reward erc20s
   await transferNftToErc20AndManage(infraERC20, nft1, nftOwner1);
   await mine(1);
   nft1 = nft1.connect(infraERC20Owner);
-  console.log("Updated NFT to be owned by ERC20, nft owner: ", await nft1.ownerOf(await nft1.AccountId()));
 
   // Allocate some rewards to the NFT
   const rewardAmount1 = 1000000;
   await erc20a.transfer(await nft1.getAddress(), rewardAmount1);
-  console.log("NFT Balance: ", await erc20a.balanceOf(await nft1.getAddress()));
   expect(await erc20a.balanceOf(await nft1.getAddress())).to.equal(rewardAmount1);
 
-  console.log("nft withdraw balances, erc20 is ", await infraERC20.getAddress(), "and erc20 owner is ", infraERC20Owner.address);
   // And then send the rewards to the ERC20
   await expect(infraERC20.withdrawFromAllManagedNFTs())
     .to.emit(infraERC20, "WithdrawalStarted")
@@ -240,9 +244,8 @@ async function basicDistributionTests(
     .and.emit(infraERC20, "Withdrawal").withArgs(await nft1.getAddress())
     .and.emit(infraERC20, "WithdrawalFinished");
 
-  console.log("distribute to all holders")
   // Attempt to distribute with no holders
-  await expect(infraERC20.distributeToAllHolders()).to.be.reverted;
+  await expect(infraERC20.distributeToAllHolders()).to.not.emit(infraERC20, "Distribution");
 
   // Grant a single holder some of the Infra ERC20 tokens and then distribute all held rewards to them
   await expect(infraERC20.mint(holder1.address, 100)).to.emit(infraERC20, "Transfer").withArgs(ZERO_ADDRESS, holder1.address, 100);
@@ -254,8 +257,177 @@ async function basicDistributionTests(
     .and.emit(erc20a, "Transfer").withArgs(await infraERC20.getAddress(), holder1.address, rewardAmount1);
 }
 
+async function randomDistributionTests(
+  infraERC20: LiquidInfrastructureERC20,
+  supply: bigint,
+  numAccounts: number,
+  distributions: number,
+  nfts: LiquidInfrastructureNFT[],
+  erc20s: TestERC20A[],
+) {
+  const infraAddress = await infraERC20.getAddress();
+  const signers = await ethers.getSigners();
+  const holderAllocations = randomDivisions(supply, BigInt(numAccounts));
+  const totalRevenue = supply * BigInt(20);
+  const revenue = randomDivisions(totalRevenue, BigInt(Math.ceil(Math.random() * 15))); // Random distributions of lots of rewards
+  if (holderAllocations == null) {
+    throw new Error("Unable to generate random divisions");
+  }
+
+  // Create accounts from the signers and mint ERC20s for them
+  let accounts = [];
+  for (let i = 0; i < numAccounts; i++) {
+    const s = signers[10 + i];
+    accounts.push(s);
+    await infraERC20.approveHolder(s.address);
+    await expect(infraERC20.mint(s.address, holderAllocations[i])).to.emit(infraERC20, "Transfer").withArgs(ZERO_ADDRESS, s.address, holderAllocations[i]);
+    expect(await infraERC20.balanceOf(s.address)).to.equal(holderAllocations[i])
+  }
+
+  // Divide all the revenue into a number of distributions
+  console.log("revenue: %s, distributions: %s", revenue, distributions);
+  let revenueDistributions: number[][] = chunk(revenue, Math.ceil(revenue.length / distributions));
+  for (let d = 0; d < revenueDistributions.length; d++) {
+    let revByNFT = revenueDistributions[d];
+
+    // For each distribution, send the NFTs their portion of the revenue
+    for (let r = 0; r < revByNFT.length; r++) {
+      let rev = revByNFT[r]
+      let nft = nfts[r % nfts.length];
+      let nftAddr = await nft.getAddress();
+      let erc20 = erc20s[r];
+      await erc20.mint(nftAddr, rev);
+      expect(await erc20.balanceOf(nftAddr)).to.be.at.least(rev);
+    }
+    await infraERC20.withdrawFromAllManagedNFTs();
+    // Wait for the distribution timer to expire
+    await mine(500);
+    // Distribute the accrued revenue
+    await infraERC20.distributeToAllHolders();
+  }
+
+  // After all the distributions, the holders should have their fraction of the `totalRevenue` based on their `division` of the `supply`
+  for (let a = 0; a < accounts.length; a++) {
+    let account = accounts[a];
+    let division = BigInt(holderAllocations[a]);
+    let entitlement = BigInt(division / supply) * totalRevenue;
+    let totalReceived = BigInt(0);
+    for (let e of erc20s) {
+      totalReceived += await e.balanceOf(account.address);
+    }
+    expect(totalReceived).to.equal(entitlement);
+  }
+}
+
+// Creates `divisions` number of random integers which sum to `total`
+function randomDivisions(total: bigint, divisions: bigint) {
+  if (divisions > total) {
+    throw new Error("total must be at least as large as divisions");
+  }
+  let ret = [];
+  let remainder = total;
+
+  for (let i = 0; i < divisions - BigInt(1); i++) {
+    const division = BigInt(Math.floor(Math.random() * Number(remainder)));
+    remainder -= division;
+    ret.push(division);
+  }
+  ret.push(remainder);
+
+  return ret
+}
+
+// Splits an array into chunks with `sz` elements each, evenly (excluding the last)
+const chunk = (arr: any[], sz: number) => {
+  let currChunk = [];
+  let chunks = [];
+  let c = 0;
+  for (let i = 0; i < arr.length; i++) {
+    if (c >= sz) {
+      c = 0;
+      chunks.push(currChunk);
+      currChunk = [];
+    }
+    currChunk.push(arr[i]);
+    c++;
+  }
+  return chunks;
+}
+
+async function nftReleaseTests(
+  infraERC20: LiquidInfrastructureERC20,
+  nft1: LiquidInfrastructureNFT, nft2: LiquidInfrastructureNFT, nft3: LiquidInfrastructureNFT,
+  account1: HardhatEthersSigner, account2: HardhatEthersSigner, account3: HardhatEthersSigner,
+) {
+  const erc20BadSigner = infraERC20.connect(account1);
+  await transferNftToErc20AndManage(infraERC20, nft1, account1);
+  await transferNftToErc20AndManage(infraERC20, nft2, account2);
+  await transferNftToErc20AndManage(infraERC20, nft3, account3);
+  // Transfer the NFT back to the original holder
+  expect(await infraERC20.releaseManagedNFT(await nft1.getAddress(), account1.address))
+    .to.emit(infraERC20, "ReleaseManagedNFT").withArgs(await nft1.getAddress(), account1.address);
+
+  await expect(erc20BadSigner.releaseManagedNFT(await nft2.getAddress(), account2.address)).to.be.revertedWith("Ownable: caller is not the owner");
+
+  await expect(infraERC20.releaseManagedNFT(await nft1.getAddress(), account1.address)).to.be.revertedWith("ERC721: transfer caller is not owner nor approved");
+
+  await transferNftToErc20AndManage(infraERC20, nft1, account1);
+  await expect(infraERC20.releaseManagedNFT(await nft1.getAddress(), account1.address)).to.not.be.reverted;
+  await expect(infraERC20.releaseManagedNFT(await nft3.getAddress(), account3.address)).to.not.be.reverted;
+}
+
 describe("LiquidInfrastructureERC20 tests", function () {
-  it("works right", async function () {
-    await runTest({})
+  it("manages NFTs", async function () {
+    const { infraERC20, nftAccount1, nftAccount2, badSigner } = await liquidErc20Fixture();
+
+    await basicNftManagementTests(infraERC20, nftAccount1, nftAccount2, badSigner);
   });
+
+  it("adds and releases NFTs", async function () {
+    const { infraERC20, nftAccount1, nftAccount2, nftAccount3 } = await liquidErc20Fixture();
+    const nft1 = await deployLiquidNFT(nftAccount1);
+    const nft2 = await deployLiquidNFT(nftAccount2);
+    const nft3 = await deployLiquidNFT(nftAccount3);
+
+    await nftReleaseTests(infraERC20, nft1, nft2, nft3, nftAccount1, nftAccount2, nftAccount3);
+  })
+
+  it("manages holders", async function () {
+    const { infraERC20, holder1, holder2, badSigner } = await liquidErc20Fixture();
+
+
+    await basicErc20HolderTests(infraERC20, holder1, holder2, badSigner);
+  });
+
+  it("manages distributions (basic)", async function () {
+    const { infraERC20, erc20Owner, testERC20A, testERC20B, testERC20C, nftAccount1, nftAccount2, nftAccount3, holder1, holder2, holder3, holder4 } = await liquidErc20Fixture();
+
+
+    const holders = [holder1, holder2, holder3, holder4];
+    for (let holder of holders) {
+      const address = holder.address;
+      await expect(infraERC20.approveHolder(address)).to.not.be.reverted;
+    }
+    const nftOwners = [nftAccount1, nftAccount2, nftAccount3];
+    let nfts: LiquidInfrastructureNFT[] = [await deployLiquidNFT(nftAccount1), await deployLiquidNFT(nftAccount2), await deployLiquidNFT(nftAccount3)];
+    const erc20s: ERC20[] = [testERC20A, testERC20B, testERC20C];
+    for (const nft of nfts) {
+      nft.setThresholds(erc20s, erc20s.map(() => 0));
+    }
+    await basicDistributionTests(infraERC20, erc20Owner, holders, nftOwners, nfts, erc20s);
+  });
+
+  it("manages distributions (random)", async function () {
+    const { infraERC20, erc20Owner, nftAccount1 } = await liquidErc20Fixture();
+
+
+
+    let nfts = [await deployLiquidNFT(nftAccount1), await deployLiquidNFT(nftAccount1), await deployLiquidNFT(nftAccount1)];
+    const erc20As = [await deployERC20A(erc20Owner), await deployERC20A(erc20Owner), await deployERC20A(erc20Owner), await deployERC20A(erc20Owner)];
+    for (let nft of nfts) {
+      await nft.setThresholds(await erc20As.map(async (e) => await e.getAddress()), erc20As.map(() => 0))
+    }
+    await randomDistributionTests(infraERC20, (BigInt(1000000) * BigInt(ONE_ETH)), 50, 5, nfts, erc20As);
+  });
+
 });

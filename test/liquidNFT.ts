@@ -24,7 +24,7 @@ async function runTest(opts: {}) {
 
   // Deploy a LiquidInfrastructureNFT, subsequent function calls use the deployer as the message signer
   //////////////////
-  const accountAsDeployer = await deployLiquidNFT(deployer.address);
+  const accountAsDeployer = await deployLiquidNFT(deployer);
   const nftAddress = await accountAsDeployer.getAddress();
   // Enable calls on the LiquidInfrastructureNFT as the future owner
   const accountAsNewOwner = accountAsDeployer.connect(newOwner);
@@ -33,13 +33,12 @@ async function runTest(opts: {}) {
 
   // Deploy several ERC20 tokens
   //////////////////
-  // console.log("Deploying");
   const { testERC20A, testERC20B, testERC20C } = await deployContracts(deployer);
 
-  // console.log("Owner tests");
+  console.log("Owner tests");
   await runOwnerTests(accountAsDeployer, deployer, accountAsNewOwner, newOwner, testERC20A, testERC20B, testERC20C);
 
-  // console.log("Approval tests");
+  console.log("Approval tests");
   await runApprovalTests(accountAsNewOwner, newOwner, accountAsDeployer, deployer, accountToApprove, toApprove, deployer, testERC20A, testERC20B, testERC20C);
 }
 
@@ -100,15 +99,11 @@ async function runOwnerTests(
 
 
   // transfer tokens to the NFT as if this were via x/microtx
-  const erc20Signer = await deployer.getAddress();
   const withdrawalAmount = 1000000;
-  // console.log("Owner: Sending test erc20s to NFT");
   await sendTestERC20sToAccount(testERC20A, testERC20B, testERC20C, nftAddress, withdrawalAmount);
 
-  // console.log("Owner: Withdrawing ERC20s");
   await withdrawSomeERC20sAndAssertBalances(newOwner, deployer, accountAsDeployer, mainnetUSDC, withdrawalAmount, deployer, testERC20A, testERC20B, testERC20C);
 
-  // console.log("Owner: Beginning account recovery");
   await testRecoveryProcessInit(accountAsDeployer, accountAsNewOwner);
 }
 

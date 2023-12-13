@@ -2,32 +2,32 @@ import { TestERC20A } from "../typechain-types";
 import { TestERC20B } from "../typechain-types";
 import { TestERC20C } from "../typechain-types";
 import { LiquidInfrastructureNFT } from "../typechain-types";
-import { Signer } from "ethers";
+import { ethers } from "hardhat";
+import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { LiquidInfrastructureERC20 } from "../typechain-types";
 
-type DeployContractsOptions = {
-  corruptSig?: boolean;
-};
+export async function deployContracts(signer?: HardhatEthersSigner) {
 
-export async function deployContracts(signer?: Signer | undefined) {
-
-  const testERC20A = await ethers.deployContract("TestERC20A", signer);
+  const testERC20A = await ethers.deployContract("TestERC20A", signer) as unknown as TestERC20A;
   // const testERC20A = await TestERC20A.deploy() as TestERC20A;
 
-  const testERC20B = await ethers.deployContract("TestERC20B", signer);
+  const testERC20B = await ethers.deployContract("TestERC20B", signer) as unknown as TestERC20B;
 
-  const testERC20C = await ethers.deployContract("TestERC20C", signer);
+  const testERC20C = await ethers.deployContract("TestERC20C", signer) as unknown as TestERC20C;
 
   return { testERC20A, testERC20B, testERC20C };
 }
 
-export async function deployLiquidNFT(account: string) {
-  const LiquidNFT = await ethers.getContractFactory("LiquidInfrastructureNFT");
-  return (await LiquidNFT.deploy(account)) as LiquidInfrastructureNFT;
+export async function deployERC20A(signer: HardhatEthersSigner) {
+  return await ethers.deployContract("TestERC20A", signer) as unknown as TestERC20A;
+}
+
+export async function deployLiquidNFT(account: HardhatEthersSigner) {
+  return await ethers.deployContract("LiquidInfrastructureNFT", [account.address], account) as unknown as LiquidInfrastructureNFT;
 }
 
 export async function deployLiquidERC20(
-  owner: Signer,
+  owner: HardhatEthersSigner,
   erc20Name: string,
   erc20Symbol: string,
   managedNFTs: string[],
@@ -35,11 +35,5 @@ export async function deployLiquidERC20(
   minDistributionPeriod: number,
   distributableErc20s: string[],
 ) {
-  const LiquidERC20 = await ethers.getContractFactory("LiquidInfrastructureERC20", owner);
-  // Constructor args:
-  // string memory _name,
-  // string memory _symbol,
-  // address[] memory _managedNFTs,
-  // address[] memory _approvedHolders
-  return (await LiquidERC20.deploy(erc20Name, erc20Symbol, managedNFTs, approvedHolders, minDistributionPeriod, distributableErc20s)) as LiquidInfrastructureERC20;
+  return await ethers.deployContract("LiquidInfrastructureERC20", [erc20Name, erc20Symbol, managedNFTs, approvedHolders, minDistributionPeriod, distributableErc20s], owner) as unknown as LiquidInfrastructureERC20;
 }

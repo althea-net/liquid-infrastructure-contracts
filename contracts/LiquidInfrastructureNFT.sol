@@ -133,15 +133,14 @@ contract LiquidInfrastructureNFT is ERC721, OwnableApprovableERC721 {
      * @notice This function is access controlled, only the owner or an approved msg.sender may call this function
      */
     function withdrawBalances(address[] calldata erc20s) public virtual {
-        console.log("Enter withdrawBalances([erc20s])");
         console.log(
-            "caller is %s, owner is %s",
-            _msgSender(),
-            ERC721(this).ownerOf(AccountId)
+            "NFT: %s - Enter withdrawBalances([erc20s]), caller %s",
+            address(this),
+            _msgSender()
         );
         require(
-            _msgSender() == this.ownerOf(AccountId),
-            "caller is not the owner of the Account token"
+            _isApprovedOrOwner(_msgSender(), AccountId),
+            "caller is not the owner of the Account token and is not approved either"
         );
         address destination = ownerOf(AccountId);
         _withdrawBalancesTo(erc20s, destination);

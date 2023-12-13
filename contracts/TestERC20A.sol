@@ -25,4 +25,8 @@ contract TestERC20A is ERC20 {
             100000000000000000000000000
         );
     }
+
+    function mint(address to, uint256 amount) public {
+        _mint(to, amount);
+    }
 }

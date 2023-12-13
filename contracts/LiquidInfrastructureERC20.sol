@@ -145,8 +145,9 @@ contract LiquidInfrastructureERC20 is
         if (from == address(0) || to == address(0)) {
             _beforeMintOrBurn();
         }
-        bool exists = (this.balanceOf(to) == 0);
+        bool exists = (this.balanceOf(to) != 0);
         if (!exists) {
+            console.log("Adding to holders");
             holders.push(to);
         }
     }
@@ -174,10 +175,11 @@ contract LiquidInfrastructureERC20 is
         uint256 amount
     ) internal virtual override {
         console.log("Enter _afterTokenTransfer(%s,%s,%s)", from, to, amount);
-        bool stillHolding = (this.balanceOf(from) == 0);
+        bool stillHolding = (this.balanceOf(from) != 0);
         if (!stillHolding) {
             for (uint i = 0; i < holders.length; i++) {
                 if (holders[i] == from) {
+                    console.log("Removing from holders");
                     // Remove the element at i by copying the last one into its place and removing the last element
                     holders[i] = holders[holders.length - 1];
                     holders.pop();
@@ -230,12 +232,12 @@ contract LiquidInfrastructureERC20 is
                     IERC20 toDistribute = IERC20(distributableERC20s[j]);
                     uint256 entitlement = erc20EntitlementPerUnit[j] *
                         this.balanceOf(recipient);
-                    console.log(
-                        "Distributing %s %s -> %s",
-                        entitlement,
-                        address(toDistribute),
-                        recipient
-                    );
+                    // console.log(
+                    //     "Distributing %s %s -> %s",
+                    //     entitlement,
+                    //     address(toDistribute),
+                    //     recipient
+                    // );
                     bool success = toDistribute.transfer(
                         recipient,
                         entitlement
