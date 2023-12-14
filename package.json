@@ -12,10 +12,11 @@
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.2",
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",
-    "hardhat": "^2.19.1"
+    "hardhat": "^2.19.2"
   },
   "dependencies": {
     "@openzeppelin/contracts": "4.3.1",
+    "command-line-args": "^5.2.1",
     "ethereum-waffle": "^4.0.10"
   }
 }
