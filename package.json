@@ -5,18 +5,24 @@
   "main": "index.js",
   "scripts": {
     "test": "npx hardhat test",
-    "compile": "npx hardhat compile"
+    "compile": "npx hardhat compile",
+    "evm": "npx hardhat node"
   },
   "author": "Christian Borst",
   "license": "ISC",
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.2",
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@types/command-line-args": "^5.2.3",
     "hardhat": "^2.19.2"
   },
   "dependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.2",
+    "@nomicfoundation/hardhat-ethers": "^3.0.5",
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
     "@openzeppelin/contracts": "4.3.1",
     "command-line-args": "^5.2.1",
-    "ethereum-waffle": "^4.0.10"
+    "ethers": "^6.9.0",
+    "hardhat": "^2.19.2"
   }
 }
