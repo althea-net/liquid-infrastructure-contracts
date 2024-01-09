@@ -33,7 +33,7 @@ contract LiquidInfrastructureERC20 is
     ReentrancyGuard
 {
     event DistributionStarted();
-    event Distribution(address recipient);
+    event Distribution(address recipient, address[] tokens, uint256[] amounts);
     event DistributionFinished();
     event WithdrawalStarted();
     event Withdrawal(address source);
@@ -41,7 +41,7 @@ contract LiquidInfrastructureERC20 is
     event AddManagedNFT(address nft);
     event ReleaseManagedNFT(address nft, address to);
 
-    IERC20[] private distributableERC20s;
+    address[] private distributableERC20s;
     uint256[] private erc20EntitlementPerUnit;
     address[] private holders;
 
@@ -221,32 +221,27 @@ contract LiquidInfrastructureERC20 is
 
         uint i;
         for (i = nextDistributionRecipient; i < limit; i++) {
-            console.log(
-                "Distribution: i=%s nextDistributionRecipient=%s",
-                i,
-                nextDistributionRecipient
-            );
             address recipient = holders[i];
             if (isApprovedHolder(recipient)) {
+                uint256[] memory receipts = new uint256[](
+                    distributableERC20s.length
+                );
                 for (uint j = 0; j < distributableERC20s.length; j++) {
                     IERC20 toDistribute = IERC20(distributableERC20s[j]);
                     uint256 entitlement = erc20EntitlementPerUnit[j] *
                         this.balanceOf(recipient);
-                    // console.log(
-                    //     "Distributing %s %s -> %s",
-                    //     entitlement,
-                    //     address(toDistribute),
-                    //     recipient
-                    // );
-                    bool success = toDistribute.transfer(
-                        recipient,
-                        entitlement
-                    );
-
-                    // TODO: Should we ignore this failure instead? The unsent funds would be rolled into the next distribution
-                    require(success, "failed to distribute to recipient");
+                    if (toDistribute.transfer(recipient, entitlement)) {
+                        receipts[j] = entitlement;
+                        console.log(
+                            "Distribution: recipient=%s erc20=%s receipt=%s",
+                            recipient,
+                            address(toDistribute),
+                            entitlement
+                        );
+                    }
                 }
-                emit Distribution(recipient);
+
+                emit Distribution(recipient, distributableERC20s, receipts);
             }
         }
         nextDistributionRecipient = i;
@@ -478,7 +473,7 @@ contract LiquidInfrastructureERC20 is
      * @param _distributableERC20s  The new list value to set
      */
     function setDistributableERC20s(
-        IERC20[] memory _distributableERC20s
+        address[] memory _distributableERC20s
     ) public onlyOwner {
         distributableERC20s = _distributableERC20s;
     }
@@ -498,7 +493,7 @@ contract LiquidInfrastructureERC20 is
         address[] memory _managedNFTs,
         address[] memory _approvedHolders,
         uint256 _minDistributionPeriod,
-        IERC20[] memory _distributableErc20s
+        address[] memory _distributableErc20s
     ) ERC20(_name, _symbol) Ownable() {
         ManagedNFTs = _managedNFTs;
         LastDistribution = block.number;

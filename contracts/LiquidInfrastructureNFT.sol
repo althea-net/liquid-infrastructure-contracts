@@ -31,7 +31,7 @@ import "hardhat/console.sol";
  * normally with withdrawBalances().
  */
 contract LiquidInfrastructureNFT is ERC721, OwnableApprovableERC721 {
-    event SuccessfulWithdrawal(address[] erc20s);
+    event SuccessfulWithdrawal(address to, address[] erc20s, uint256[] amounts);
     event TryRecover();
     event SuccessfulRecovery(address[] erc20s, uint256[] amounts);
     event ThresholdsChanged(address[] newErc20s, uint256[] newAmounts);
@@ -182,15 +182,20 @@ contract LiquidInfrastructureNFT is ERC721, OwnableApprovableERC721 {
         address[] calldata erc20s,
         address destination
     ) internal {
+        uint256[] memory amounts = new uint256[](erc20s.length);
         for (uint i = 0; i < erc20s.length; i++) {
             address erc20 = erc20s[i];
             uint256 balance = IERC20(erc20).balanceOf(address(this));
             if (balance > 0) {
                 bool result = IERC20(erc20).transfer(destination, balance);
                 require(result, "unsuccessful withdrawal");
+                amounts[i] = balance;
             }
         }
-        emit SuccessfulWithdrawal(erc20s);
+        console.log(
+            "Emitting SuccessfulWithdrawal(destination, erc20s, amounts)"
+        );
+        emit SuccessfulWithdrawal(destination, erc20s, amounts);
     }
 
     /**
