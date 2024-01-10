@@ -32,6 +32,7 @@ contract LiquidInfrastructureERC20 is
     ERC721Holder,
     ReentrancyGuard
 {
+    event Deployed();
     event DistributionStarted();
     event Distribution(address recipient, address[] tokens, uint256[] amounts);
     event DistributionFinished();
@@ -505,5 +506,7 @@ contract LiquidInfrastructureERC20 is
         MinDistributionPeriod = _minDistributionPeriod;
 
         distributableERC20s = _distributableErc20s;
+
+        emit Deployed();
     }
 }
