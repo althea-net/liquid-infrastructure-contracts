@@ -8,7 +8,6 @@ import {
 } from "../typechain-types";
 import fs from "fs";
 import commandLineArgs from "command-line-args";
-import { mine } from "@nomicfoundation/hardhat-network-helpers";
 import { exit } from "process";
 import { HardhatEthersProvider } from "@nomicfoundation/hardhat-ethers/internal/hardhat-ethers-provider";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
@@ -17,19 +16,21 @@ const hardhat = require("hardhat");
 const ethers = hardhat.ethers;
 
 // Create constants for each of the TestERC20*'s and for the liquid nft and liquid erc20
-const TestERC20AExpectedAddress = "0x7c2C195CD6D34B8F845992d380aADB2730bB9C6F";
-const TestERC20BExpectedAddress = "0x8858eeB3DfffA017D4BCE9801D340D36Cf895CCf";
-const TestERC20CExpectedAddress = "0x0078371BDeDE8aAc7DeBfFf451B74c5EDB385Af7";
-const LiquidNFTExpectedAddress = "0xf4e77E5Da47AC3125140c470c71cBca77B5c638c";
-const LiquidERC20ExpectedAddress = "0xf784709d2317D872237C4bC22f867d1BAe2913AB";
+const TestERC20AExpectedAddress = "0x09ff6eAb62d740deFF107056b645AD2e9b5E50DC";
+const TestERC20BExpectedAddress = "0x5a262E97f6A7D994f60C3281b63e7297b1782949";
+const TestERC20CExpectedAddress = "0x5A2815572ba8efF2dd28C1EF5941B2590c3e1A2d";
+const LiquidNFTExpectedAddress = "0xAFAE450146dAB6Ff6e25C78Eb017b343710724F7";
+const LiquidERC20ExpectedAddress = "0xA5644387318B974Ce281b8dbd5677082d12E1B4b";
 
 async function deploy() {
+  console.log("Enter deploy function");
   var startTime = new Date();
   const signers = await ethers.getSigners();
   let wallet = signers[0];
 
   var success = false;
   while (!success) {
+    console.log("Looping until connection to network is made");
     var present = new Date();
     var timeDiff: number = present.getTime() - startTime.getTime();
     timeDiff = timeDiff / 1000;
@@ -48,6 +49,7 @@ async function deploy() {
     }
     await sleep(1000);
   }
+  console.log("Connected to network");
 
   // this handles several possible locations for the ERC20 artifacts
   var erc20_a_path: string;
@@ -228,7 +230,7 @@ async function deploy() {
       "INFRA",
       [],
       [],
-      100,
+      5,
       [erc20TestAddressA, erc20TestAddressB, erc20TestAddressC],
     ]);
     await liquidERC20.waitForDeployment();
@@ -262,6 +264,7 @@ async function generateActivity(
   nft: LiquidInfrastructureNFT,
   erc20: LiquidInfrastructureERC20
 ) {
+  console.log("Generating activity...");
   // Connect erc20s to owner to prevent silly errors
   for (let i = 0; i < erc20s.length; i++) {
     erc20s[i] = erc20s[i].connect(owner);
@@ -270,6 +273,9 @@ async function generateActivity(
   let holders = signers.slice(1, 6);
 
   if (deployed) {
+    console.log(
+      "Contracts deployed, setting up the NFT gto be mamaged by the ERC20"
+    );
     await nft.setThresholds(
       erc20s,
       erc20s.map(() => 0)
@@ -280,12 +286,14 @@ async function generateActivity(
 
   // Give the NFT a balance of each ERC20
   for (let erc20 of erc20s) {
+    console.log("Granting NFT some of the test erc20 tokens");
     const amount = Math.floor(Math.random() * 1000000) + 1000;
 
     await erc20.transfer(await nft.getAddress(), amount);
   }
 
   if (deployed) {
+    console.log("Contracts deployed, approving holders for the erc20");
     // Approve all the holders to hold the erc20
     for (let holder of holders) {
       await erc20.approveHolder(holder.address);
@@ -296,23 +304,25 @@ async function generateActivity(
     await transferERC20ToHolders(erc20, holderAddresses, holderAmounts);
   }
 
-  // Deploy a new NFT, set its thresholds, and manage it under the ERC20
-  let newNFT = await ethers.deployContract("LiquidInfrastructureNFT", [
-    owner.address,
-  ]);
-  await newNFT.waitForDeployment();
-  await mine(1);
-  await newNFT.setThresholds(
-    erc20s,
-    erc20s.map(() => 0)
-  );
-  await transferNftToErc20AndManage(erc20, newNFT, owner);
-  // Grant newNFT it some tokens so they can be withdrawn by the ERC20
-  for (let erc20 of erc20s) {
-    const amount = Math.floor(Math.random() * 400000) + 10000;
+  // console.log("Deploying a new NFT to manage with the ERC20");
+  // // Deploy a new NFT, set its thresholds, and manage it under the ERC20
+  // let newNFT = await ethers.deployContract("LiquidInfrastructureNFT", [
+  //   owner.address,
+  // ]);
+  // await newNFT.waitForDeployment();
+  // await newNFT.setThresholds(
+  //   erc20s,
+  //   erc20s.map(() => 0)
+  // );
+  // await transferNftToErc20AndManage(erc20, newNFT, owner);
+  // await sleep(20000); // wait 10 seconds
+  // // Grant newNFT it some tokens so they can be withdrawn by the ERC20
+  // for (let erc20 of erc20s) {
+  //   console.log("Granting the new NFT some of the test erc20 tokens");
+  //   const amount = Math.floor(Math.random() * 400000) + 10000;
 
-    await erc20.transfer(await newNFT.getAddress(), amount);
-  }
+  //   await erc20.transfer(await newNFT.getAddress(), amount);
+  // }
 
   console.log("Withdrawing...");
   await erc20.withdrawFromAllManagedNFTs();
@@ -321,8 +331,7 @@ async function generateActivity(
     await owner.provider.getBlockNumber()
   );
   console.log();
-
-  await mine(100);
+  await sleep(10000); // wait 10 seconds
 
   console.log("Distributing..");
   await erc20.distributeToAllHolders();
