@@ -9,7 +9,6 @@ import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./LiquidInfrastructureNFT.sol";
-import "hardhat/console.sol";
 
 /**
  * @title Liquid Infrastructure ERC20
@@ -93,7 +92,6 @@ contract LiquidInfrastructureERC20 is
      * @param account the potential holder of the token
      */
     function isApprovedHolder(address account) public view returns (bool) {
-        console.log("Enter isApprovedHolder");
         return HolderAllowlist[account];
     }
 
@@ -106,7 +104,6 @@ contract LiquidInfrastructureERC20 is
      * @param holder the account to add to the allowlist
      */
     function approveHolder(address holder) public onlyOwner {
-        console.log("Enter approveHolder(%s)", holder);
         require(!isApprovedHolder(holder), "holder already approved");
         HolderAllowlist[holder] = true;
     }
@@ -119,7 +116,6 @@ contract LiquidInfrastructureERC20 is
      * @param holder the account to add to the allowlist
      */
     function disapproveHolder(address holder) public onlyOwner {
-        console.log("Enter disapproveHolder(%s)", holder);
         require(isApprovedHolder(holder), "holder not approved");
         HolderAllowlist[holder] = false;
     }
@@ -135,7 +131,6 @@ contract LiquidInfrastructureERC20 is
         address to,
         uint256 amount
     ) internal virtual override {
-        console.log("Enter _beforeTokenTransfer(%s,%s,%s)", from, to, amount);
         require(!LockedForDistribution, "distribution in progress");
         if (!(to == address(0))) {
             require(
@@ -148,7 +143,6 @@ contract LiquidInfrastructureERC20 is
         }
         bool exists = (this.balanceOf(to) != 0);
         if (!exists) {
-            console.log("Adding to holders");
             holders.push(to);
         }
     }
@@ -157,7 +151,6 @@ contract LiquidInfrastructureERC20 is
      * Implements an additional lock on minting and burning, ensuring that supply changes happen after any potential distributions
      */
     function _beforeMintOrBurn() internal view {
-        console.log("Enter _beforeMintOrBurn()");
         require(
             !_isPastMinDistributionPeriod(),
             "must distribute before minting or burning"
@@ -175,12 +168,10 @@ contract LiquidInfrastructureERC20 is
         address to,
         uint256 amount
     ) internal virtual override {
-        console.log("Enter _afterTokenTransfer(%s,%s,%s)", from, to, amount);
         bool stillHolding = (this.balanceOf(from) != 0);
         if (!stillHolding) {
             for (uint i = 0; i < holders.length; i++) {
                 if (holders[i] == from) {
-                    console.log("Removing from holders");
                     // Remove the element at i by copying the last one into its place and removing the last element
                     holders[i] = holders[holders.length - 1];
                     holders.pop();
@@ -190,7 +181,6 @@ contract LiquidInfrastructureERC20 is
     }
 
     function distributeToAllHolders() public {
-        console.log("Enter distributeToAllHolders()");
         uint256 num = holders.length;
         if (num > 0) {
             distribute(holders.length);
@@ -205,7 +195,6 @@ contract LiquidInfrastructureERC20 is
      * @param numDistributions the number of distributions to process in this execution
      */
     function distribute(uint256 numDistributions) public nonReentrant {
-        console.log("Enter distribute(%s)", numDistributions);
         require(numDistributions > 0, "must process at least 1 distribution");
         if (!LockedForDistribution) {
             require(
@@ -233,12 +222,6 @@ contract LiquidInfrastructureERC20 is
                         this.balanceOf(recipient);
                     if (toDistribute.transfer(recipient, entitlement)) {
                         receipts[j] = entitlement;
-                        console.log(
-                            "Distribution: recipient=%s erc20=%s receipt=%s",
-                            recipient,
-                            address(toDistribute),
-                            entitlement
-                        );
                     }
                 }
 
@@ -253,7 +236,6 @@ contract LiquidInfrastructureERC20 is
     }
 
     function _isPastMinDistributionPeriod() internal view returns (bool) {
-        console.log("Enter _isPastMinDistributionPeriod()");
         // Do not force a distribution with no holders or supply
         if (totalSupply() == 0 || holders.length == 0) {
             return false;
@@ -272,7 +254,6 @@ contract LiquidInfrastructureERC20 is
             !LockedForDistribution,
             "cannot begin distribution when already locked"
         );
-        console.log("Enter _beginDistribution()");
         LockedForDistribution = true;
 
         // clear the previous entitlements, if any
@@ -287,12 +268,6 @@ contract LiquidInfrastructureERC20 is
                 address(this)
             );
             uint256 entitlement = balance / supply;
-            console.log(
-                "Calculated entitlement per unit: %s = %s / %s",
-                entitlement,
-                balance,
-                supply
-            );
             erc20EntitlementPerUnit.push(entitlement);
         }
 
@@ -308,7 +283,6 @@ contract LiquidInfrastructureERC20 is
             LockedForDistribution,
             "cannot end distribution when not locked"
         );
-        console.log("Enter _endDistribution()");
         delete erc20EntitlementPerUnit;
         LockedForDistribution = false;
         LastDistribution = block.number;
@@ -325,7 +299,6 @@ contract LiquidInfrastructureERC20 is
         address account,
         uint256 amount
     ) public onlyOwner {
-        console.log("Enter mintAndDistribute(%s,%s)", account, amount);
         if (_isPastMinDistributionPeriod()) {
             distributeToAllHolders();
         }
@@ -341,13 +314,11 @@ contract LiquidInfrastructureERC20 is
         address account,
         uint256 amount
     ) public onlyOwner nonReentrant {
-        console.log("Enter mint(%s,%s)", account, amount);
         _mint(account, amount);
     }
 
     // TODO: Remove this redundant definition
     function burn(uint256 amount) public override {
-        console.log("Enter burn(%s)", amount);
         _burn(msg.sender, amount);
     }
 
@@ -358,7 +329,6 @@ contract LiquidInfrastructureERC20 is
      * if this fails then first call distribute() enough times to finish a distribution and then call burn()
      */
     function burnAndDistribute(uint256 amount) public {
-        console.log("Enter burnAndDistribute(%s)", amount);
         if (_isPastMinDistributionPeriod()) {
             distributeToAllHolders();
         }
@@ -372,7 +342,6 @@ contract LiquidInfrastructureERC20 is
      * if this fails then first call distribute() enough times to finish a distribution and then call burnFrom()
      */
     function burnFromAndDistribute(address account, uint256 amount) public {
-        console.log("Enter burnFromAndDistribute(%s,%s)", account, amount);
         if (_isPastMinDistributionPeriod()) {
             distribute(holders.length);
         }
@@ -380,7 +349,6 @@ contract LiquidInfrastructureERC20 is
     }
 
     function withdrawFromAllManagedNFTs() public {
-        console.log("Enter withdrawFromAllManagedNFTs()");
         withdrawFromManagedNFTs(ManagedNFTs.length);
     }
 
@@ -389,7 +357,6 @@ contract LiquidInfrastructureERC20 is
      * @param numWithdrawals the number of withdrawals to perform
      */
     function withdrawFromManagedNFTs(uint256 numWithdrawals) public {
-        console.log("Enter withdrawFromManagedNFTs(%s)", numWithdrawals);
         require(!LockedForDistribution, "cannot withdraw during distribution");
 
         if (nextWithdrawal == 0) {
@@ -425,7 +392,6 @@ contract LiquidInfrastructureERC20 is
      * @param nftContract the LiquidInfrastructureNFT contract to add to ManagedNFTs
      */
     function addManagedNFT(address nftContract) public onlyOwner {
-        console.log("Enter addManagedNFT(%s)", nftContract);
         LiquidInfrastructureNFT nft = LiquidInfrastructureNFT(nftContract);
         address nftOwner = nft.ownerOf(nft.AccountId());
         require(
@@ -448,7 +414,6 @@ contract LiquidInfrastructureERC20 is
         address nftContract,
         address to
     ) public onlyOwner nonReentrant {
-        console.log("Enter releaseManagedNFT(%s,%s)", nftContract, to);
         LiquidInfrastructureNFT nft = LiquidInfrastructureNFT(nftContract);
         nft.transferFrom(address(this), to, nft.AccountId());
 

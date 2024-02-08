@@ -4,7 +4,6 @@ pragma solidity 0.8.12; // Force solidity compliance
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "./OwnableApprovableERC721.sol";
-import "hardhat/console.sol";
 
 /**
  * @title Liquid Infrastructure NFT
@@ -133,11 +132,6 @@ contract LiquidInfrastructureNFT is ERC721, OwnableApprovableERC721 {
      * @notice This function is access controlled, only the owner or an approved msg.sender may call this function
      */
     function withdrawBalances(address[] calldata erc20s) public virtual {
-        console.log(
-            "NFT: %s - Enter withdrawBalances([erc20s]), caller %s",
-            address(this),
-            _msgSender()
-        );
         require(
             _isApprovedOrOwner(_msgSender(), AccountId),
             "caller is not the owner of the Account token and is not approved either"
@@ -159,12 +153,6 @@ contract LiquidInfrastructureNFT is ERC721, OwnableApprovableERC721 {
         address[] calldata erc20s,
         address destination
     ) public virtual {
-        console.log(
-            "NFT: %s - Enter withdrawBalancesTo([erc20s], %s), caller %s",
-            address(this),
-            destination,
-            _msgSender()
-        );
         require(
             _isApprovedOrOwner(_msgSender(), AccountId),
             "caller is not the owner of the Account token and is not approved either"
@@ -192,9 +180,6 @@ contract LiquidInfrastructureNFT is ERC721, OwnableApprovableERC721 {
                 amounts[i] = balance;
             }
         }
-        console.log(
-            "Emitting SuccessfulWithdrawal(destination, erc20s, amounts)"
-        );
         emit SuccessfulWithdrawal(destination, erc20s, amounts);
     }
 
