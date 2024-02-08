@@ -16,11 +16,11 @@ const hardhat = require("hardhat");
 const ethers = hardhat.ethers;
 
 // Create constants for each of the TestERC20*'s and for the liquid nft and liquid erc20
-const TestERC20AExpectedAddress = "0x09ff6eAb62d740deFF107056b645AD2e9b5E50DC";
-const TestERC20BExpectedAddress = "0x5a262E97f6A7D994f60C3281b63e7297b1782949";
-const TestERC20CExpectedAddress = "0x5A2815572ba8efF2dd28C1EF5941B2590c3e1A2d";
-const LiquidNFTExpectedAddress = "0xAFAE450146dAB6Ff6e25C78Eb017b343710724F7";
-const LiquidERC20ExpectedAddress = "0xA5644387318B974Ce281b8dbd5677082d12E1B4b";
+const TestERC20AExpectedAddress = "0x7c2C195CD6D34B8F845992d380aADB2730bB9C6F";
+const TestERC20BExpectedAddress = "0x8858eeB3DfffA017D4BCE9801D340D36Cf895CCf";
+const TestERC20CExpectedAddress = "0x0078371BDeDE8aAc7DeBfFf451B74c5EDB385Af7";
+const LiquidNFTExpectedAddress = "0xf4e77E5Da47AC3125140c470c71cBca77B5c638c";
+const LiquidERC20ExpectedAddress = "0xf784709d2317d872237c4bc22f867d1bae2913ab";
 
 async function deploy() {
   console.log("Enter deploy function");
@@ -230,8 +230,9 @@ async function deploy() {
       "INFRA",
       [],
       [],
-      5,
-      [erc20TestAddressA, erc20TestAddressB, erc20TestAddressC],
+      10,
+      // [erc20TestAddressA, erc20TestAddressB, erc20TestAddressC],
+      [erc20TestAddressA],
     ]);
     await liquidERC20.waitForDeployment();
     liquidERC20Address = await liquidERC20.getAddress();
@@ -241,10 +242,20 @@ async function deploy() {
     );
   }
 
+  // Generates multi-token activity
+  // await generateActivity(
+  //   wallet,
+  //   contractsDeployed,
+  //   [testERC20A, testERC20B, testERC20C],
+  //   liquidNFT,
+  //   liquidERC20
+  // );
+
+  // Generates single-token activity (testERC20A)
   await generateActivity(
     wallet,
     contractsDeployed,
-    [testERC20A, testERC20B, testERC20C],
+    [testERC20A],
     liquidNFT,
     liquidERC20
   );
@@ -274,7 +285,7 @@ async function generateActivity(
 
   if (deployed) {
     console.log(
-      "Contracts deployed, setting up the NFT gto be mamaged by the ERC20"
+      "Contracts deployed, setting up the NFT to be managed by the ERC20"
     );
     await nft.setThresholds(
       erc20s,
@@ -304,25 +315,33 @@ async function generateActivity(
     await transferERC20ToHolders(erc20, holderAddresses, holderAmounts);
   }
 
-  // console.log("Deploying a new NFT to manage with the ERC20");
-  // // Deploy a new NFT, set its thresholds, and manage it under the ERC20
-  // let newNFT = await ethers.deployContract("LiquidInfrastructureNFT", [
-  //   owner.address,
-  // ]);
-  // await newNFT.waitForDeployment();
-  // await newNFT.setThresholds(
-  //   erc20s,
-  //   erc20s.map(() => 0)
-  // );
-  // await transferNftToErc20AndManage(erc20, newNFT, owner);
-  // await sleep(20000); // wait 10 seconds
-  // // Grant newNFT it some tokens so they can be withdrawn by the ERC20
-  // for (let erc20 of erc20s) {
-  //   console.log("Granting the new NFT some of the test erc20 tokens");
-  //   const amount = Math.floor(Math.random() * 400000) + 10000;
+  console.log("Deploying a new NFT to manage with the ERC20");
+  // Deploy a new NFT, set its thresholds, and manage it under the ERC20
+  let newNFT = await ethers.deployContract("LiquidInfrastructureNFT", [
+    owner.address,
+  ]);
+  await newNFT.waitForDeployment();
+  console.log("New NFT deployed at Address - ", await newNFT.getAddress());
+  console.log("Waiting for chain settlement");
+  await sleep(10000);
+  console.log("Setting new NFT's thresholds");
+  await newNFT.setThresholds(
+    erc20s,
+    erc20s.map(() => 0)
+  );
+  console.log("Waiting for chain settlement");
+  await sleep(10000);
+  console.log("Transferring new NFT ownership to ERC20");
+  await transferNftToErc20AndManage(erc20, newNFT, owner);
+  console.log("Waiting for chain settlement");
+  await sleep(10000); // wait 10 seconds
+  // Grant newNFT it some tokens so they can be withdrawn by the ERC20
+  for (let erc20 of erc20s) {
+    console.log("Granting the new NFT some of the test erc20 tokens");
+    const amount = Math.floor(Math.random() * 400000) + 10000;
 
-  //   await erc20.transfer(await newNFT.getAddress(), amount);
-  // }
+    await erc20.transfer(await newNFT.getAddress(), amount);
+  }
 
   console.log("Withdrawing...");
   await erc20.withdrawFromAllManagedNFTs();
@@ -349,7 +368,7 @@ async function transferNftToErc20AndManage(
   const infraAddress = await erc20.getAddress();
   const accountId = await nft.AccountId();
   await nft.transferFrom(owner, infraAddress, accountId);
-
+  await sleep(10000);
   await erc20.addManagedNFT(await nft.getAddress());
 }
 
