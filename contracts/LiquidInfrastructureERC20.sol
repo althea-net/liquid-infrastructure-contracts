@@ -23,6 +23,8 @@ import "./LiquidInfrastructureNFT.sol";
  *
  * Revenue is gathered from managed LiquidInfrastructureNFTs by the protocol and distributed to token holders on a semi-regular basis,
  * where there is a minimum number of blocks required to elapse before a new payout to token holders.
+ *
+ * Minting and burning of this ERC20 is restricted if the minimum distribution period has elapsed, and it is reenabled once a new distribution is complete.
  */
 contract LiquidInfrastructureERC20 is
     ERC20,
@@ -96,8 +98,6 @@ contract LiquidInfrastructureERC20 is
     }
 
     /**
-     * TODO: Role based holder approvals, or leave this as onlyOwner?
-     *
      * Adds `holder` to the list of approved token holders. This is necessary before `holder` may receive any of the underlying ERC20.
      * @notice this call will fail if `holder` is already approved. Call isApprovedHolder() first to avoid mistakes.
      *
@@ -109,8 +109,6 @@ contract LiquidInfrastructureERC20 is
     }
 
     /**
-     * TODO: Role based holder disapprovals, or leave this as onlyOwner?
-     *
      * Marks `holder` as NOT approved to hold the token, preventing them from receiving any more of the underlying ERC20.
      *
      * @param holder the account to add to the allowlist
@@ -180,6 +178,9 @@ contract LiquidInfrastructureERC20 is
         }
     }
 
+    /**
+     * Performs a distribution to all of the current holders, which may trigger out of gas errors if there are too many holders
+     */
     function distributeToAllHolders() public {
         uint256 num = holders.length;
         if (num > 0) {
@@ -235,6 +236,10 @@ contract LiquidInfrastructureERC20 is
         }
     }
 
+    /**
+     * Determines if the minimum distribution period has elapsed, which is used for restricting
+     * minting and burning operations
+     */
     function _isPastMinDistributionPeriod() internal view returns (bool) {
         // Do not force a distribution with no holders or supply
         if (totalSupply() == 0 || holders.length == 0) {
@@ -317,11 +322,6 @@ contract LiquidInfrastructureERC20 is
         _mint(account, amount);
     }
 
-    // TODO: Remove this redundant definition
-    function burn(uint256 amount) public override {
-        _burn(msg.sender, amount);
-    }
-
     /**
      * Convenience function that allows a token holder to distribute when necessary and then burn their tokens right after
      *
@@ -343,7 +343,7 @@ contract LiquidInfrastructureERC20 is
      */
     function burnFromAndDistribute(address account, uint256 amount) public {
         if (_isPastMinDistributionPeriod()) {
-            distribute(holders.length);
+            distributeToAllHolders();
         }
         burnFrom(account, amount);
     }

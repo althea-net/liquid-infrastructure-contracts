@@ -10,7 +10,8 @@ import "./OwnableApprovableERC721.sol";
  * @author Christian Borst <christian@althea.systems>
  *
  * @dev An NFT contract used to control a Liquid Infrastructure Account - a Cosmos Bank module account intrinsically connected to the EVM
- * through Althea's x/microtx module.
+ * through Althea's x/microtx module. On chains which are not Althea-L1 this is a standalone ERC721 which should receive revenue periodically,
+ * and the protocol manager must ensure LiquidInfrastructureNFTs receive the revenue they are owed.
  *
  * A Liquid Infrastructure Account typically represents some form of infrastructure involved in an Althea pay-per-forward network
  * which frequently receives payments from peers on the network for performing an automated service (e.g. providing internet).
@@ -53,7 +54,7 @@ contract LiquidInfrastructureNFT is ERC721, OwnableApprovableERC721 {
 
     /**
      * Constructs the underlying ERC721 with a URI like "althea://liquid-infrastructure-account/{accountName}", and
-     * a symbol like "TA:{accountName}".
+     * a symbol like "LIA:{accountName}".
      * Mints the Account token (ID=1), the only token held in this NFT.
      *
      * @param accountName The bech32 address of the controlled x/bank account
