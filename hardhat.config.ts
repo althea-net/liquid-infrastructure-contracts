@@ -30,7 +30,7 @@ const DAI_TEST5 = vars.get(
 );
 
 const config: HardhatUserConfig = {
-  solidity: "0.8.12",
+  solidity: "0.8.19",
   networks: {
     dai: {
       url: "https://rpc.gnosischain.com",
