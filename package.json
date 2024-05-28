@@ -12,17 +12,21 @@
   "license": "ISC",
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.2",
+    "@nomicfoundation/hardhat-ethers": "^3.0.5",
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@types/bignumber.js": "^5.0.0",
     "@types/command-line-args": "^5.2.3",
-    "hardhat": "^2.19.2"
+    "bignumber.js": "^9.1.2",
+    "hardhat": "^2.19.2",
+    "typescript-bignumber": "^1.1.0"
   },
   "dependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.2",
-    "@nomicfoundation/hardhat-ethers": "^3.0.5",
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",
     "@openzeppelin/contracts": "4.3.1",
     "command-line-args": "^5.2.1",
     "ethers": "^6.9.0",
-    "hardhat": "^2.19.2"
+    "hardhat": "^2.19.2",
+    "help": "^3.0.2"
   }
 }
