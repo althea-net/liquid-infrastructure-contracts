@@ -11,9 +11,9 @@ export async function deployContracts(signer?: HardhatEthersSigner) {
   const testERC20A = await ethers.deployContract("TestERC20A", signer) as unknown as TestERC20A;
   // const testERC20A = await TestERC20A.deploy() as TestERC20A;
 
-  const testERC20B = await ethers.deployContract("TestERC20B", signer) as unknown as TestERC20B;
+  const testERC20B = await ethers.deployContract("TestERC20A", signer) as unknown as TestERC20A;
 
-  const testERC20C = await ethers.deployContract("TestERC20C", signer) as unknown as TestERC20C;
+  const testERC20C = await ethers.deployContract("TestERC20A", signer) as unknown as TestERC20A;
 
   return { testERC20A, testERC20B, testERC20C };
 }
@@ -30,10 +30,12 @@ export async function deployLiquidERC20(
   owner: HardhatEthersSigner,
   erc20Name: string,
   erc20Symbol: string,
-  managedNFTs: string[],
   approvedHolders: string[],
-  minDistributionPeriod: number,
   distributableErc20s: string[],
 ) {
-  return await ethers.deployContract("LiquidInfrastructureERC20", [erc20Name, erc20Symbol, managedNFTs, approvedHolders, minDistributionPeriod, distributableErc20s], owner) as unknown as LiquidInfrastructureERC20;
+  return await ethers.deployContract("LiquidInfrastructureERC20", [erc20Name, erc20Symbol, approvedHolders, distributableErc20s], owner) as unknown as LiquidInfrastructureERC20;
+}
+
+export function randi(max: number): number {
+  return Math.floor(Math.random() * max);
 }
