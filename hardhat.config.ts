@@ -30,7 +30,25 @@ const DAI_TEST5 = vars.get(
 );
 
 const config: HardhatUserConfig = {
-  solidity: "0.8.19",
+  solidity: {
+    compilers: [
+      {
+        version: "0.8.19",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 1000000,
+          },
+          outputSelection: {
+            "*": {
+              "*": ["storageLayout"],
+            },
+          },
+        },
+      },
+    ],
+    overrides: {},
+  },
   networks: {
     dai: {
       url: "https://rpc.gnosischain.com",

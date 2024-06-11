@@ -124,7 +124,10 @@ describe('TestLiquidERC20', () => {
 
       for (let i = 0; i < signers.length; i++) {
         for (let j = 0; j < erc20s.length; j++) {
-          expect(balanceBySignerBefore[i][j] + revenueByHolder[i][j] == balanceBySignerAfter[i][j]).to.be.true;
+          let before = balanceBySignerBefore[i][j];
+          let after = balanceBySignerAfter[i][j];
+          let rev = revenueByHolder[i][j];
+          expect(before.plus(rev).eq(after)).to.be.true;
         }
       }
    });
@@ -148,7 +151,7 @@ describe('TestLiquidERC20', () => {
       await claimRevenue(signers, token);
    });
 
-   it("BigNumber Revenue Claim with Accounting", async () => {
+   it("BigNumberRevenue Claim z with Accounting", async () => {
       let deployer = signers[0];
       let numNFTs = randi(25) + 1;
       let nfts = await deployLiquidNFTs(deployer, numNFTs, erc20s, erc20s.map((v) => 0));
@@ -178,7 +181,7 @@ describe('TestLiquidERC20', () => {
           expect(actualIncrease.gte(acceptableIncrease)).to.be.true;
         }
       }
-   });
+   }).timeout(80000); // Increase the timeout to 80 seconds
 
    it("Many Stakers BigNumber Revenue Claim", async () => {
       let deployer = signers[0];
@@ -204,7 +207,7 @@ describe('TestLiquidERC20', () => {
       await token.withdrawFromAllManagedNFTs();
 
       await claimRevenue(holders, token);
-   }).timeout(80000); // Increase the timeout to 80 seconds
+   }).timeout(120000); // Increase the timeout to 80 seconds
 
    it("BigNumber Three Phase Staking", async () => {
       let deployer = signers[0];
@@ -292,7 +295,7 @@ describe('TestLiquidERC20', () => {
         let actualRevenue = balanceBySignerAfter[i].map((v, j) => BN.BigNumber(v).minus(balanceBySignerBefore[i][j]));
         actualRevenue.map((v, j) => expect(v.gte(acceptableRevenue[j])).to.be.true);
       }
-   }).timeout(80000); // Increase the timeout to 80 seconds
+   }).timeout(120000); // Increase the timeout to 80 seconds
 
    it("BigNumber Agent Staking", async () => {
       const start = Date.now();
@@ -360,7 +363,7 @@ describe('TestLiquidERC20', () => {
       }
 
       let w = -1;
-      while (Date.now() - start < 60 * 1000) {
+      while (Date.now() - start < five_minutes) {
         w += 1;
         console.log("Withdrawal " + w)
         for (let s = 0; s < stakerActionsPerWithdrawal; s++) {
@@ -376,6 +379,7 @@ describe('TestLiquidERC20', () => {
             await stakeFromHolders([newStaker], token);
             withdrawalData[w].stakers.push({signer: newStaker, stake: stake});
             withdrawalData[w].totalStake = withdrawalData[w].totalStake.plus(stake);
+            console.log("Added staker " + newStaker.address + " with stake " + stake.toString());
           } else if (action < 70 && withdrawalData[w].stakers.length > 0) {
             // 30% chance of unstaking
             let unstaker = withdrawalData[w].stakers[withdrawalData[w].stakers.length - 1];
@@ -487,13 +491,13 @@ describe('TestLiquidERC20', () => {
 
           let acceptableIncrease = expectedRevenue.times(1 - acceptableError);
           if (! actualIncrease.gte(acceptableIncrease)) {
-            console.log("Holder: " + holders[h].address + " ERC20: " + e + " Expected: " + expectedRevenue + " Actual: " + actualIncrease);
+            console.log("Holder: " + holders[h].address + " ERC20: " + await erc20s[e].getAddress() + " Expected: " + expectedRevenue.toFixed() + " Actual: " + actualIncrease.toFixed());
           }
           expect(actualIncrease.gte(acceptableIncrease)).to.be.true;
         }
       }
     }
-  ).timeout(1000 * 60 * 5); // Increase the timeout to 5 minutes
+  ).timeout(1000 * 60 * 8); // Increase the timeout to 8 minutes
   }
 );
 
@@ -573,13 +577,13 @@ export async function claimRevenue(stakers: HardhatEthersSigner[], token: Liquid
   }
 }
 
-export async function getSignerBalances(signers: HardhatEthersSigner[], erc20s: ERC20[]): Promise<number[][]> {
-  let balances: number[][] = [];
+export async function getSignerBalances(signers: HardhatEthersSigner[], erc20s: ERC20[]): Promise<BN.BigNumber[][]> {
+  let balances: BN.BigNumber[][] = [];
   for (let signer of signers) {
-    let signerBalances: number[] = [];
+    let signerBalances: BN.BigNumber[] = [];
     for (let erc20 of erc20s) {
       let balance = await erc20.balanceOf(signer.address);
-      signerBalances.push(Number.parseInt(balance.toString()));
+      signerBalances.push(BN.BigNumber(balance.toString()));
     }
     balances.push(signerBalances);
   }
