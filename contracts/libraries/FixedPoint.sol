@@ -76,7 +76,7 @@ library FixedPoint {
     /// @notice Converts a Q192.64 fixed point number to a Q128.64 fixed point number, reverts if x is too large
     function toQ128x64(q192x64 memory x) internal pure returns (q128x64 memory) {
         require(x.value <= type(uint192).max, "FixedPoint: too large");
-        return q128x64(uint192(x.value << 64));
+        return q128x64(uint192(x.value));
     }
 
     /// @notice Adds two Q64.64 numbers together
@@ -145,10 +145,10 @@ library FixedPoint {
         uint256 xf = uint64(uint192(x.value << 128) >> 128);
         uint256 yw = uint256(y.value >> 64);
         uint256 yf = uint64(uint192(y.value << 128) >> 128);
-        uint256 work = xw * yw;
+        uint256 work = xw * yw << 64;
         work += xw * yf;
         work += xf * yw;
-        work += xf * yf >> 64;
+        work += (xf * yf) >> 64;
 
         return q192x64(work);
     }
