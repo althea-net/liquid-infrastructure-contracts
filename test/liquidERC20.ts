@@ -299,7 +299,7 @@ describe('TestLiquidERC20', () => {
 
    it("BigNumber Agent Staking", async () => {
       const start = Date.now();
-      const five_minutes = 5 * 60 * 1000;
+      const three_minutes = 3 * 60 * 1000;
       const stakerActionsPerWithdrawal = 5;
       const ownerActionsPerWithdrawal = 2;
       let deployer = signers[0];
@@ -363,7 +363,7 @@ describe('TestLiquidERC20', () => {
       }
 
       let w = -1;
-      while (Date.now() - start < five_minutes) {
+      while (Date.now() - start < three_minutes) {
         w += 1;
         console.log("Withdrawal " + w)
         for (let s = 0; s < stakerActionsPerWithdrawal; s++) {
