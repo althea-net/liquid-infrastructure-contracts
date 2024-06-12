@@ -34,27 +34,27 @@ const ONE_ETH = 1000000000000000000;
 // Ethereum-waffle is used to extend chai and add ethereum matchers: https://ethereum-waffle.readthedocs.io/en/latest/matchers.html
 
 import {AddressLike, assert, BigNumberish} from "ethers";
-import * as BN from "bignumber.js";
+import {BigNumber} from "bignumber.js";
 
 const PRECISION = 100000000
-const PRECISION_BN = BN.BigNumber(PRECISION)
-export const Q_64 = BN.BigNumber(2).pow(64);
-export const Q_128 = BN.BigNumber(2).pow(128);
+const PRECISION_BN = BigNumber(PRECISION)
+export const Q_64 = BigNumber(2).pow(64);
+export const Q_128 = BigNumber(2).pow(128);
 export const ZERO_ADDR = "0x0000000000000000000000000000000000000000"
 
-export function toQ64 (val: number | BN.BigNumber): bigint {
-    var multFixed: BN.BigNumber;
+export function toQ64 (val: number | BigNumber): bigint {
+    var multFixed: BigNumber;
     if (typeof val === 'number') {
-        multFixed = BN.BigNumber(Math.round(val * PRECISION));
+        multFixed = BigNumber(Math.round(val * PRECISION));
     } else {
         multFixed = val.times(PRECISION);
     }
-    let res = (multFixed.times(Q_64).div(BN.BigNumber(PRECISION)))
+    let res = (multFixed.times(Q_64).div(BigNumber(PRECISION)))
     return BigInt(res.toFixed())
 }
 
-export function fromQ64 (val: bigint): BN.BigNumber {
-    return BN.BigNumber(val.toString()).times(PRECISION_BN).div(Q_64).div(PRECISION_BN);
+export function fromQ64 (val: bigint): BigNumber {
+    return BigNumber(val.toString()).times(PRECISION_BN).div(Q_64).div(PRECISION_BN);
 }
 
 describe('TestLiquidERC20', () => {
@@ -63,11 +63,11 @@ describe('TestLiquidERC20', () => {
    let holderAddresses: AddressLike[]
    let erc20s: ERC20[]
    let acceptableError = 0.001 // 0.1% error
-   const Q64_MIN = BN.BigNumber(2).pow(63).minus(1).negated();
-   const oneEth  = BN.BigNumber(10).pow(18);
-   const TT64  = BN.BigNumber(2).pow(64);
-   const TT128 = BN.BigNumber(2).pow(128);
-   const TT192 = BN.BigNumber(2).pow(192);
+   const Q64_MIN = BigNumber(2).pow(63).minus(1).negated();
+   const oneEth  = BigNumber(10).pow(18);
+   const TT64  = BigNumber(2).pow(64);
+   const TT128 = BigNumber(2).pow(128);
+   const TT192 = BigNumber(2).pow(192);
 
    beforeEach("deploy", async () => {
       signers = await ethers.getSigners();
@@ -138,10 +138,10 @@ describe('TestLiquidERC20', () => {
       let nfts = await deployLiquidNFTs(deployer, numNFTs, erc20s, erc20s.map((v) => 0));
       await manageNFTs(deployer, token, nfts, true);
 
-      let revenuePerNFTByERC20 = erc20s.map((v) => BN.BigNumber(1000000).times(oneEth));
+      let revenuePerNFTByERC20 = erc20s.map((v) => BigNumber(1000000).times(oneEth));
       await fundNFTs(deployer, nfts, erc20s as TestERC20A[], revenuePerNFTByERC20);
 
-      let stakeByHolder = holderAddresses.map((v) => BN.BigNumber(randi(1000000) + 1).times(oneEth));
+      let stakeByHolder = holderAddresses.map((v) => BigNumber(randi(1000000) + 1).times(oneEth));
       await mintToHolders(deployer, token, holderAddresses, stakeByHolder);
 
       await stakeFromHolders(signers, token);
@@ -157,12 +157,12 @@ describe('TestLiquidERC20', () => {
       let nfts = await deployLiquidNFTs(deployer, numNFTs, erc20s, erc20s.map((v) => 0));
       await manageNFTs(deployer, token, nfts, true);
 
-      let revenuePerNFTByERC20 = erc20s.map((v) => BN.BigNumber(1000000).times(oneEth));
+      let revenuePerNFTByERC20 = erc20s.map((v) => BigNumber(1000000).times(oneEth));
       await fundNFTs(deployer, nfts, erc20s as TestERC20A[], revenuePerNFTByERC20);
 
-      let stakeByHolder = holderAddresses.map((v) => BN.BigNumber(randi(1000000) + 1).times(oneEth));
+      let stakeByHolder = holderAddresses.map((v) => BigNumber(randi(1000000) + 1).times(oneEth));
       await mintToHolders(deployer, token, holderAddresses, stakeByHolder);
-      let totalStake = stakeByHolder.reduce((a, b) => a.plus(b), BN.BigNumber(0));
+      let totalStake = stakeByHolder.reduce((a, b) => a.plus(b), BigNumber(0));
 
       let totalRevenueByERC20 = revenuePerNFTByERC20.map((v) => v.times(numNFTs));
       let revenueByHolder = stakeByHolder.map((v) => totalRevenueByERC20.map((w) => v.times(w).div(totalStake).integerValue()));
@@ -176,8 +176,8 @@ describe('TestLiquidERC20', () => {
 
       for (let i = 0; i < signers.length; i++) {
         for (let j = 0; j < erc20s.length; j++) {
-          let actualIncrease = BN.BigNumber(balanceBySignerAfter[i][j]).minus(balanceBySignerBefore[i][j]);
-          let acceptableIncrease = revenueByHolder[i][j].times(BN.BigNumber(1).minus(acceptableError));
+          let actualIncrease = BigNumber(balanceBySignerAfter[i][j]).minus(balanceBySignerBefore[i][j]);
+          let acceptableIncrease = revenueByHolder[i][j].times(BigNumber(1).minus(acceptableError));
           expect(actualIncrease.gte(acceptableIncrease)).to.be.true;
         }
       }
@@ -196,10 +196,10 @@ describe('TestLiquidERC20', () => {
       let nfts = await deployLiquidNFTs(deployer, numNFTs, erc20s, erc20s.map((v) => 0));
       await manageNFTs(deployer, token, nfts, true);
 
-      let revenuePerNFTByERC20 = erc20s.map((v) => BN.BigNumber(1000000).times(oneEth));
+      let revenuePerNFTByERC20 = erc20s.map((v) => BigNumber(1000000).times(oneEth));
       await fundNFTs(deployer, nfts, erc20s as TestERC20A[], revenuePerNFTByERC20);
 
-      let stakeByHolder = holders.map((v) => BN.BigNumber(randi(100000000) + 1).times(oneEth));
+      let stakeByHolder = holders.map((v) => BigNumber(randi(100000000) + 1).times(oneEth));
       await mintToHolders(deployer, token, holderAddresses, stakeByHolder);
 
       await stakeFromHolders(holders, token);
@@ -224,11 +224,11 @@ describe('TestLiquidERC20', () => {
       let numNFTs = randi(50) + 1;
       let nfts = await deployLiquidNFTs(deployer, numNFTs, erc20s, erc20s.map((v) => 0));
       await manageNFTs(deployer, token, nfts, true);
-      let revenuePerNFTByERC20 = erc20s.map((v) => BN.BigNumber(1000000).times(oneEth));
-      let stakeByHolder = holders.map((v) => BN.BigNumber(randi(100000000) + 1).times(oneEth));
-      let firstWaveTotalStake = stakeByHolder.reduce((a, b, i) => a.plus(i < 50 ? b : 0), BN.BigNumber(0));
-      let secondWaveTotalStake = stakeByHolder.reduce((a, b, i) => a.plus(i < 100 && i > 49 ? b : 0), BN.BigNumber(0));
-      let thirdWaveTotalStake = stakeByHolder.reduce((a, b, i) => a.plus(i > 99  ? b : 0), BN.BigNumber(0));
+      let revenuePerNFTByERC20 = erc20s.map((v) => BigNumber(1000000).times(oneEth));
+      let stakeByHolder = holders.map((v) => BigNumber(randi(100000000) + 1).times(oneEth));
+      let firstWaveTotalStake = stakeByHolder.reduce((a, b, i) => a.plus(i < 50 ? b : 0), BigNumber(0));
+      let secondWaveTotalStake = stakeByHolder.reduce((a, b, i) => a.plus(i < 100 && i > 49 ? b : 0), BigNumber(0));
+      let thirdWaveTotalStake = stakeByHolder.reduce((a, b, i) => a.plus(i > 99  ? b : 0), BigNumber(0));
       // Minting to the holders can happen all at once since staking determines the revenue sharing
       await mintToHolders(deployer, token, holderAddresses, stakeByHolder);
 
@@ -256,7 +256,7 @@ describe('TestLiquidERC20', () => {
         let totalRelevantStake = firstWaveTotalStake.plus(secondWaveTotalStake).plus(thirdWaveTotalStake);
         let expectedRevenueThird = revenuePerNFTByERC20.map((v) => stakeByHolder[i].times(v).div(totalRelevantStake));
         let acceptableRevenueThird = expectedRevenueThird.map((v) => v.times(1 - acceptableError));
-        let actualRevenueThird = balanceBySignerAfter[i].map((v, j) => BN.BigNumber(v).minus(balanceBySignerBefore[i][j]));
+        let actualRevenueThird = balanceBySignerAfter[i].map((v, j) => BigNumber(v).minus(balanceBySignerBefore[i][j]));
         actualRevenueThird.map((v, j) => expect(v.gte(acceptableRevenueThird[j])).to.be.true);
       }
       // Check second wave entitlement, which got payouts from the second and third waves
@@ -271,7 +271,7 @@ describe('TestLiquidERC20', () => {
         let expectedRevenue = expectedRevenueSecond.map((v, j) => v.plus(expectedRevenueThird[j]));
 
         let acceptableRevenue = expectedRevenue.map((v) => v.times(1 - acceptableError));
-        let actualRevenue = balanceBySignerAfter[i].map((v, j) => BN.BigNumber(v).minus(balanceBySignerBefore[i][j]));
+        let actualRevenue = balanceBySignerAfter[i].map((v, j) => BigNumber(v).minus(balanceBySignerBefore[i][j]));
         actualRevenue.map((v, j) => expect(v.gte(acceptableRevenue[j])).to.be.true);
 
       }
@@ -292,7 +292,7 @@ describe('TestLiquidERC20', () => {
 
 
         let acceptableRevenue = expectedRevenue.map((v) => v.times(1 - acceptableError));
-        let actualRevenue = balanceBySignerAfter[i].map((v, j) => BN.BigNumber(v).minus(balanceBySignerBefore[i][j]));
+        let actualRevenue = balanceBySignerAfter[i].map((v, j) => BigNumber(v).minus(balanceBySignerBefore[i][j]));
         actualRevenue.map((v, j) => expect(v.gte(acceptableRevenue[j])).to.be.true);
       }
    }).timeout(120000); // Increase the timeout to 80 seconds
@@ -318,15 +318,15 @@ describe('TestLiquidERC20', () => {
 
       type StakerData = {
         signer: HardhatEthersSigner;
-        stake: BN.BigNumber;
+        stake: BigNumber;
       };
       type NFTData = {
         nft: LiquidInfrastructureNFT;
-        balances: BN.BigNumber[];
-        thresholds: BN.BigNumber[];
+        balances: BigNumber[];
+        thresholds: BigNumber[];
       };
       type WithdrawalData = {
-        totalStake: BN.BigNumber;
+        totalStake: BigNumber;
         stakers: StakerData[];
         nfts: NFTData[];
         nftRemovals: NFTData[];
@@ -334,14 +334,14 @@ describe('TestLiquidERC20', () => {
 
       // Initialize the collection of withdrawal data
       let withdrawalData: WithdrawalData[] = [];
-      withdrawalData.push({totalStake: BN.BigNumber(0), stakers: new Array<StakerData>(initialStakers), nfts: new Array<NFTData>(initialManagedNFTs), nftRemovals: new Array<NFTData>()});
+      withdrawalData.push({totalStake: BigNumber(0), stakers: new Array<StakerData>(initialStakers), nfts: new Array<NFTData>(initialManagedNFTs), nftRemovals: new Array<NFTData>()});
       await Promise.all(nfts.slice(0, initialManagedNFTs).map(async (n, i) => {
         await n.setApprovalForAll(await token.getAddress(), true);
         await token.addManagedNFT(await n.getAddress());
-        withdrawalData[0].nfts[i] = {nft: n,  balances: erc20s.map((v) => BN.BigNumber(0)), thresholds: erc20s.map((v) => BN.BigNumber(0))};
+        withdrawalData[0].nfts[i] = {nft: n,  balances: erc20s.map((v) => BigNumber(0)), thresholds: erc20s.map((v) => BigNumber(0))};
       }));
       let startingStakers = holders.slice(0, initialStakers);
-      let stakeAllocation = startingStakers.map((h) => BN.BigNumber(randi(1000000)).times(oneEth));
+      let stakeAllocation = startingStakers.map((h) => BigNumber(randi(1000000)).times(oneEth));
       await mintToHolders(deployer, token, startingStakers, stakeAllocation);
       await stakeFromHolders(startingStakers, token);
       for (let i = 0; i < startingStakers.length; i++) {
@@ -353,11 +353,11 @@ describe('TestLiquidERC20', () => {
       let unmanagedNFTs = nfts.slice(initialManagedNFTs, nfts.length);
       let unstakedHolders = holders.slice(initialStakers, holders.length);
 
-      let holderBalancesBefore: BN.BigNumber[][] = new Array<BN.BigNumber[]>(holders.length);
+      let holderBalancesBefore: BigNumber[][] = new Array<BigNumber[]>(holders.length);
       for (let h = 0; h < holders.length; h++) {
-        let balances: BN.BigNumber[] = new Array<BN.BigNumber>(erc20s.length);
+        let balances: BigNumber[] = new Array<BigNumber>(erc20s.length);
         for (let e = 0; e < erc20s.length; e++) {
-          balances[e] = BN.BigNumber((await erc20s[e].balanceOf(holders[h].address)).toString());
+          balances[e] = BigNumber((await erc20s[e].balanceOf(holders[h].address)).toString());
         }
         holderBalancesBefore[h] = balances;
       }
@@ -374,7 +374,7 @@ describe('TestLiquidERC20', () => {
           } else if (action < 40 && unstakedHolders.length > 0) {
             // 30% chance of adding a new staker
             let newStaker = unstakedHolders.pop() as HardhatEthersSigner;
-            let stake = BN.BigNumber(randi(1000000)).times(oneEth);
+            let stake = BigNumber(randi(1000000)).times(oneEth);
             await mintToHolders(deployer, token, [newStaker.address], [stake]);
             await stakeFromHolders([newStaker], token);
             withdrawalData[w].stakers.push({signer: newStaker, stake: stake});
@@ -384,17 +384,17 @@ describe('TestLiquidERC20', () => {
             // 30% chance of unstaking
             let unstaker = withdrawalData[w].stakers[withdrawalData[w].stakers.length - 1];
             let amount = unstaker.stake;
-            if (amount.eq(BN.BigNumber(0))) {
+            if (amount.eq(BigNumber(0))) {
               // Cannot unstake from a staker with no stake
               continue;
             }
             await unstakeFromHolders([unstaker.signer], token);
-            unstaker.stake = BN.BigNumber(0);
+            unstaker.stake = BigNumber(0);
             withdrawalData[w].totalStake = withdrawalData[w].totalStake.minus(amount);
           } else {
             // 30% chance of claiming revenue
             let claimer = withdrawalData[w].stakers[randi(withdrawalData[w].stakers.length)];
-            if (claimer.stake.eq(BN.BigNumber(0))) {
+            if (claimer.stake.eq(BigNumber(0))) {
               // Cannot claim with no stake!
               continue;
             }
@@ -409,7 +409,7 @@ describe('TestLiquidERC20', () => {
             let newNFT = unmanagedNFTs.pop() as LiquidInfrastructureNFT;
             await newNFT.setApprovalForAll(await token.getAddress(), true);
             await token.addManagedNFT(await newNFT.getAddress());
-            withdrawalData[w].nfts.push({nft: newNFT, thresholds: erc20s.map((v) => BN.BigNumber(0)), balances: erc20s.map((v) => BN.BigNumber(0))});
+            withdrawalData[w].nfts.push({nft: newNFT, thresholds: erc20s.map((v) => BigNumber(0)), balances: erc20s.map((v) => BigNumber(0))});
           } else if (action < 40 && withdrawalData[w].nfts.length > 0) {
             // 20% chance of removing a NFT
             let nft = withdrawalData[w].nfts.pop() as NFTData;
@@ -432,14 +432,14 @@ describe('TestLiquidERC20', () => {
         }
 
         // Fund NFTs before withdrawal
-        let funding = withdrawalData[w].nfts.map(v => BN.BigNumber(randi(1000000) + 1).times(oneEth));
+        let funding = withdrawalData[w].nfts.map(v => BigNumber(randi(1000000) + 1).times(oneEth));
         let nftAddresses = await Promise.all(withdrawalData[w].nfts.map(async (v) => await v.nft.getAddress()));
         fundNFTs(deployer, nftAddresses, erc20s as TestERC20A[], funding);
 
         for (let i = 0; i < withdrawalData[w].nfts.length; i++) {
-          withdrawalData[w].nfts[i].balances = await Promise.all(erc20s.map(async (v) => BN.BigNumber(await v.balanceOf(await nftAddresses[i]).toString())));
+          withdrawalData[w].nfts[i].balances = await Promise.all(erc20s.map(async (v) => BigNumber(await v.balanceOf(await nftAddresses[i]).toString())));
           let [_, thresholds] = await withdrawalData[w].nfts[i].nft.getThresholds();
-          withdrawalData[w].nfts[i].thresholds = thresholds.map((v) => BN.BigNumber(v.toString()));
+          withdrawalData[w].nfts[i].thresholds = thresholds.map((v) => BigNumber(v.toString()));
         }
         // Owner always withdraws at the end
         await token.withdrawFromAllManagedNFTs();
@@ -448,21 +448,21 @@ describe('TestLiquidERC20', () => {
         withdrawalData.push({totalStake: withdrawalData[w].totalStake, stakers: withdrawalData[w].stakers, nfts: withdrawalData[w].nfts, nftRemovals: []});
       }
 
-      let holderBalancesAfter: BN.BigNumber[][] = new Array<BN.BigNumber[]>(holders.length);
+      let holderBalancesAfter: BigNumber[][] = new Array<BigNumber[]>(holders.length);
       for (let h = 0; h < holders.length; h++) {
-        let balances: BN.BigNumber[] = new Array<BN.BigNumber>(erc20s.length);
+        let balances: BigNumber[] = new Array<BigNumber>(erc20s.length);
         for (let e = 0; e < erc20s.length; e++) {
-          balances[e] = BN.BigNumber((await erc20s[e].balanceOf(holders[h].address)).toString());
+          balances[e] = BigNumber((await erc20s[e].balanceOf(holders[h].address)).toString());
         }
         holderBalancesAfter[h] = balances;
       }
 
       // Tally the expected holder revenue
-      let expectedHolderRevenue: {[key: string]: BN.BigNumber[]} = {};
-      holderAddresses.map((h) => expectedHolderRevenue[h] = erc20s.map((e) => BN.BigNumber(0)));
+      let expectedHolderRevenue: {[key: string]: BigNumber[]} = {};
+      holderAddresses.map((h) => expectedHolderRevenue[h] = erc20s.map((e) => BigNumber(0)));
       for (let w = 0; w < withdrawalData.length; w++) {
         // Check the balances of the stakers based on their behavior
-        let expectedTotalRevenue: BN.BigNumber[] = erc20s.map((v) => BN.BigNumber(0));
+        let expectedTotalRevenue: BigNumber[] = erc20s.map((v) => BigNumber(0));
         for (let nft of withdrawalData[w].nfts) {
           let revenue = nft.balances.map((v, i) => v.minus(nft.thresholds[i]));
           for (let i = 0; i < revenue.length; i++) {
@@ -522,12 +522,12 @@ export async function manageNFTs(owner: HardhatEthersSigner, token: LiquidInfras
   }
 }
 
-export async function fundNFTs(funder: HardhatEthersSigner, nfts: AddressLike[], erc20s: TestERC20A[], amounts: number[] | BN.BigNumber[] ) {
+export async function fundNFTs(funder: HardhatEthersSigner, nfts: AddressLike[], erc20s: TestERC20A[], amounts: number[] | BigNumber[] ) {
   for (let i = 0; i < nfts.length; i++) {
     for (let j = 0; j < erc20s.length; j++) {
       let erc20 = erc20s[j].connect(funder);
       let amount = amounts[j]
-      if (amount instanceof BN.BigNumber) {
+      if (amount instanceof BigNumber) {
         await erc20.mint(nfts[i], BigInt(amount.integerValue().toFixed()));
       } else {
         await erc20.mint(nfts[i], amount);
@@ -536,11 +536,11 @@ export async function fundNFTs(funder: HardhatEthersSigner, nfts: AddressLike[],
   }
 }
 
-export async function mintToHolders(owner: HardhatEthersSigner, token: LiquidInfrastructureERC20, holders: AddressLike[], amounts: number[] | BN.BigNumber[]) {
+export async function mintToHolders(owner: HardhatEthersSigner, token: LiquidInfrastructureERC20, holders: AddressLike[], amounts: number[] | BigNumber[]) {
   expect(holders.length == amounts.length).to.be.true;
   for (let i = 0; i < holders.length; i++) {
     let amount = amounts[i];
-    if (amount instanceof BN.BigNumber) {
+    if (amount instanceof BigNumber) {
       await token.mint(holders[i], BigInt(amount.integerValue().toFixed()));
     } else {
       await token.mint(holders[i], amount);
@@ -577,13 +577,13 @@ export async function claimRevenue(stakers: HardhatEthersSigner[], token: Liquid
   }
 }
 
-export async function getSignerBalances(signers: HardhatEthersSigner[], erc20s: ERC20[]): Promise<BN.BigNumber[][]> {
-  let balances: BN.BigNumber[][] = [];
+export async function getSignerBalances(signers: HardhatEthersSigner[], erc20s: ERC20[]): Promise<BigNumber[][]> {
+  let balances: BigNumber[][] = [];
   for (let signer of signers) {
-    let signerBalances: BN.BigNumber[] = [];
+    let signerBalances: BigNumber[] = [];
     for (let erc20 of erc20s) {
       let balance = await erc20.balanceOf(signer.address);
-      signerBalances.push(BN.BigNumber(balance.toString()));
+      signerBalances.push(BigNumber(balance.toString()));
     }
     balances.push(signerBalances);
   }
@@ -597,7 +597,7 @@ export async function generateSigners(num: number, funder: HardhatEthersSigner):
     wallet.connect(ethers.provider);
     let signer = await ethers.getImpersonatedSigner(wallet.address);
     signers.push(signer);
-    funder.sendTransaction({from: funder.address, to: signer.address, value: BN.BigNumber(ONE_ETH).times(5).toFixed()});
+    funder.sendTransaction({from: funder.address, to: signer.address, value: BigNumber(ONE_ETH).times(5).toFixed()});
   }
   return signers;
 }

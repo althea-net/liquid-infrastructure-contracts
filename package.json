@@ -14,7 +14,6 @@
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.2",
     "@nomicfoundation/hardhat-ethers": "^3.0.5",
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",
-    "@types/bignumber.js": "^5.0.0",
     "@types/command-line-args": "^5.2.3",
     "bignumber.js": "^9.1.2",
     "hardhat": "^2.19.2",
