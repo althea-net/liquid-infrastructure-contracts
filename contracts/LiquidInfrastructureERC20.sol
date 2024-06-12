@@ -12,7 +12,6 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./LiquidInfrastructureNFT.sol";
 import "./libraries/FixedPoint.sol";
 
-/// TODO: Use a safe transfer library for transferring all ERC20s
 /// TODO: Decide what happens when a holder is removed from the allowlist
 /// TODO: Reentrancy audit of all public functions
 /// TODO: NFT Transfer library?
@@ -44,6 +43,9 @@ contract LiquidInfrastructureERC20 is
     event WithdrawalFinished();
     event AddManagedNFT(address nft);
     event ReleaseManagedNFT(address nft, address to);
+    event Stake(address holder, uint256 amount);
+    event ClaimRevenue(address holder);
+    event Unstake(address holder);
 
     /**
      * @notice This is the current version of the contract. Every update to the contract will introduce a new
@@ -123,6 +125,8 @@ contract LiquidInfrastructureERC20 is
      * @param nftContract the LiquidInfrastructureNFT contract to add to ManagedNFTs
      */
     function addManagedNFT(address nftContract) public onlyOwner nonReentrant {
+        // TODO: Cannot perform while a withdrawal is in progress
+
         LiquidInfrastructureNFT nft = LiquidInfrastructureNFT(nftContract);
         address nftOwner = nft.ownerOf(nft.AccountId());
 
@@ -147,6 +151,8 @@ contract LiquidInfrastructureERC20 is
         address nftContract,
         address to
     ) public onlyOwner nonReentrant {
+        // TODO: Cannot perform while a withdrawal is in progress
+
         LiquidInfrastructureNFT nft = LiquidInfrastructureNFT(nftContract);
 
         bool found = false;
@@ -316,6 +322,8 @@ contract LiquidInfrastructureERC20 is
         totalStake += amount;
         position.snapshotAccumulators = revenueAccumsPerStake;
         stakes[msg.sender] = position;
+
+        emit Stake(msg.sender, amount);
     }
 
     /**
@@ -331,6 +339,8 @@ contract LiquidInfrastructureERC20 is
 
         // Clear out the staking position
         delete stakes[msg.sender];
+
+        emit Unstake(msg.sender);
     }
 
     /** 
@@ -353,6 +363,7 @@ contract LiquidInfrastructureERC20 is
         address account,
         uint256 amount
     ) public onlyOwner nonReentrant {
+        // TODO: Add a mintStaked() onlyOwner which mints and stakes for the holder
         _mint(account, amount);
     }
 
@@ -376,6 +387,8 @@ contract LiquidInfrastructureERC20 is
         // Update the accumulator snapshots
         position.snapshotAccumulators = revenueAccumsPerStake;
         stakes[msg.sender] = position;
+        
+        emit ClaimRevenue(msg.sender);
     }
 
     /**
