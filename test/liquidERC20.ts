@@ -132,6 +132,77 @@ describe('TestLiquidERC20', () => {
       }
    });
 
+   it("Add Distributable ERC20", async () => {
+      let deployer = signers[0];
+      let newDistributable = await deployERC20A(deployer);
+
+
+      let numNFTs = randi(25) + 1;
+      let nfts = await deployLiquidNFTs(deployer, numNFTs, erc20s, erc20s.map((v) => 0));
+      await manageNFTs(deployer, token, nfts, true);
+      let nftRevenueByERC20 = erc20s.map((v) => 1000000);
+
+      await fundNFTs(deployer, nfts, erc20s as TestERC20A[], nftRevenueByERC20);
+      await fundNFTs(deployer, nfts, [newDistributable], [1000000]);
+      let totalRevenueByERC20 = nftRevenueByERC20.map((v) => v * numNFTs);
+      totalRevenueByERC20.push(1000000 * numNFTs)
+
+      let stakeByHolder = holderAddresses.map((v) => randi(1000000) + 1);
+      let totalStake = stakeByHolder.reduce((a, b) => a + b, 0);
+      await mintToHolders(deployer, token, holderAddresses, stakeByHolder);
+      
+      let revenueByHolder = stakeByHolder.map((v) => totalRevenueByERC20.map((w) => BigNumber(Math.floor(v * w / totalStake))));
+      await stakeFromHolders(signers, token);
+
+      // Withdraw all the initial distributable ERC20s
+      await token.withdrawFromAllManagedNFTs();
+
+      // Fund the NFTs with the initial distributable ERC20s
+      await fundNFTs(deployer, nfts, erc20s as TestERC20A[], nftRevenueByERC20);
+
+      // Update all NFT thresholds to include the new token
+      for (let i = 0; i < nfts.length; i++) {
+        let nft = nfts[i];
+        let [thresholdTokens, thresholdAmounts] = await nft.getThresholds();
+        let newToken = await newDistributable.getAddress();
+        let thresholds = [...thresholdTokens, newToken];
+        let amounts = [...thresholdAmounts, BigInt(0)];
+        await token.setManagedNFTThresholds(await nft.getAddress(), thresholds, amounts);
+      }
+      // Add the new distributable token
+      await token.addDistributableERC20(await newDistributable.getAddress());
+      await token.withdrawFromAllManagedNFTs();
+
+      let balanceBySignerBefore = await getSignerBalances(signers, erc20s);
+      let newBalanceBefore = await getSignerBalances(signers, [newDistributable]);
+      await claimRevenue(signers, token);
+      let balanceBySignerAfter = await getSignerBalances(signers, erc20s);
+      let newBalanceAfter = await getSignerBalances(signers, [newDistributable]);
+
+      for (let i = 0; i < signers.length; i++) {
+        // Tally the initial ERC20s
+        let j = 0;
+        for (j = 0; j < erc20s.length; j++) {
+          let before = balanceBySignerBefore[i][j];
+          let after = balanceBySignerAfter[i][j];
+          let rev = revenueByHolder[i][j];
+          let max_expected = before.plus(rev.times(2).times(1.01));
+          let min_expected = before.plus(rev.times(2).times(0.99));
+          // Revenue was distributed twice
+          expect(after.gt(min_expected) && after.lt(max_expected)).to.be.true;
+        }
+        // Tally the new ERC20
+        let before = newBalanceBefore[i][0];
+        let after = newBalanceAfter[i][0];
+        let rev = revenueByHolder[i][j];
+        let max_expected = before.plus(rev.times(1.01));
+        let min_expected = before.plus(rev.times(0.99));
+
+        expect(after.gt(min_expected) && after.lt(max_expected)).to.be.true;
+      }
+   });
+
+
    it("BigNumber Simple Revenue Claim", async () => {
       let deployer = signers[0];
       let numNFTs = randi(25) + 1;
