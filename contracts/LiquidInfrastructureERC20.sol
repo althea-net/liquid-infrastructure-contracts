@@ -16,6 +16,7 @@ import "./libraries/FixedPoint.sol";
 /// TODO: Reentrancy audit of all public functions
 /// TODO: NFT Transfer library?
 /// TODO: Audit all for loops, especially in the withdrawFromManagedNFTs function
+/// TODO: Add a mintStaked() onlyOwner which mints and stakes for the holder
 
 /**
  * @title Liquid Infrastructure ERC20
@@ -89,6 +90,10 @@ contract LiquidInfrastructureERC20 is
     function disapproveHolder(address holder) public onlyOwner {
         require(isApprovedHolder(holder), "holder not approved");
         HolderAllowlist[holder] = false;
+        if (getStake(holder) > 0) {
+            _claimRevenueFor(holder);
+            unstake();
+        }
     }
 
     /**
@@ -99,17 +104,37 @@ contract LiquidInfrastructureERC20 is
         address to,
         uint256
     ) internal virtual override {
-        // Staking
-        if (to == address(this)) {
-            require(from != address(0), "cannot stake from mint");
-            return; // Ignore receiver checks when staking
-        }
-        if (!(to == address(0))) {
+        // Staking is allowed by only the approved holders
+        // Unstaking must be allowed by even disapproved holders, may not unstake to this address or the zero address
+        // Mints are allowed to only approved holders, and never to this address or the zero address
+        // Burns are allowed by only approved holders, and never from this address or the zero address
+
+        bool mint_ = from == address(0);
+        bool burn_ = to == address(0);
+        bool stake_ = to == address(this);
+        bool unstake_ = from == address(this);
+        require(!(mint_ && burn_), "invalid mint/burn"); // Mint and burn are mutually exclusive
+        require(!((mint_ || burn_) && (stake_ || unstake_)), "invalid mint/burn"); // Mint/burn and stake/unstake are mutually exclusive
+        require(!(stake_ && unstake_), "invalid stake/unstake"); // Stake and unstake are mutually exclusive
+        if (mint_) {
             require(
                 isApprovedHolder(to),
-                "receiver not approved"
+                "unapproved mint"
             );
         }
+        if (burn_) {
+            require(
+                isApprovedHolder(from),
+                "unapproved burn"
+            );
+        }
+        if (stake_) {
+             require(
+                isApprovedHolder(from),
+                "unapproved burn"
+            );
+        }
+        // Unstaking must be allowed from even disapproved holders
     }
 
     ////////////////////////// NFT Management and Revenue Withdrawals //////////////////////////
@@ -125,7 +150,7 @@ contract LiquidInfrastructureERC20 is
      * @param nftContract the LiquidInfrastructureNFT contract to add to ManagedNFTs
      */
     function addManagedNFT(address nftContract) public onlyOwner nonReentrant {
-        // TODO: Cannot perform while a withdrawal is in progress
+        require(nextWithdrawal == 0, "withdrawal in progress");
 
         LiquidInfrastructureNFT nft = LiquidInfrastructureNFT(nftContract);
         address nftOwner = nft.ownerOf(nft.AccountId());
@@ -151,7 +176,7 @@ contract LiquidInfrastructureERC20 is
         address nftContract,
         address to
     ) public onlyOwner nonReentrant {
-        // TODO: Cannot perform while a withdrawal is in progress
+        require(nextWithdrawal == 0, "withdrawal in progress");
 
         LiquidInfrastructureNFT nft = LiquidInfrastructureNFT(nftContract);
 
@@ -177,12 +202,15 @@ contract LiquidInfrastructureERC20 is
     /// @dev the ERC20s which may be distributed to stakers
     address[] private distributableERC20s;
 
-    /// @notice Allows the owner to overwrite the list of ERC20s which may be distributed from ManagedNFTs to the holders
-    /// @param _distributableERC20s  The new list value to set
-    function setDistributableERC20s(
-        address[] memory _distributableERC20s
+    /// @notice Allows the owner to add a new ERC20 to be distributed to holders
+    /// @param newERC20  The new list value to set
+    function addDistributableERC20(
+        IERC20 newERC20
     ) public onlyOwner {
-        distributableERC20s = _distributableERC20s;
+        require(nextWithdrawal == 0, "withdrawal in progress");
+        distributableERC20s.push(address(newERC20));
+        _ssDistributableHoldings.push(0);
+        revenueAccumsPerStake.push(FixedPoint.q128x64(0));
     }
 
     /**
@@ -331,16 +359,20 @@ contract LiquidInfrastructureERC20 is
      * The caller's revenue will be claimed as part of this operation
      */
     function unstake() public {
-        StakePosition storage position = stakes[msg.sender];
+        _unstakeFor(msg.sender);
+    }
+
+    function _unstakeFor(address staker) internal {
+        StakePosition storage position = stakes[staker];
         require(position.amount > 0, "no position to unstake");
         totalStake -= position.amount;
-        SafeERC20.safeTransfer(IERC20(this), msg.sender, position.amount);
+        SafeERC20.safeTransfer(IERC20(this), staker, position.amount);
         claimRevenue();
 
         // Clear out the staking position
-        delete stakes[msg.sender];
+        delete stakes[staker];
 
-        emit Unstake(msg.sender);
+        emit Unstake(staker);
     }
 
     /** 
@@ -363,7 +395,6 @@ contract LiquidInfrastructureERC20 is
         address account,
         uint256 amount
     ) public onlyOwner nonReentrant {
-        // TODO: Add a mintStaked() onlyOwner which mints and stakes for the holder
         _mint(account, amount);
     }
 
@@ -372,8 +403,18 @@ contract LiquidInfrastructureERC20 is
     /// @notice Stakers may claim any accrued revenue for their staking position
     /// @dev revenue must be claimed when unstaking or increasing stake amount
     function claimRevenue() public nonReentrant {
-        StakePosition storage position = stakes[msg.sender];
+        _claimRevenueFor(msg.sender);
+    }
+
+    /// @dev Claims revenue for a staker
+    function _claimRevenueFor(address staker) internal {
+        StakePosition storage position = stakes[staker];
         require(position.amount > 0, "invalid staking position");
+        // It is possible this position was made before a distributable ERC20 was added, so we add 0 for each missing value
+        while (position.snapshotAccumulators.length < distributableERC20s.length) {
+            position.snapshotAccumulators.push(FixedPoint.q128x64(0));
+        }
+
         // Withdraw all allocated rewards for each distributable ERC20
         for (uint i = 0; i < distributableERC20s.length; i++) {
             // Get the current accumulator value for the relevant ERC20
@@ -382,13 +423,13 @@ contract LiquidInfrastructureERC20 is
             FixedPoint.q128x64 memory entitlement = FixedPoint.subQ128(accum, position.snapshotAccumulators[i]);
             // The actual reward is (staked amount) * (entitlement per stake)
             uint256 reward = FixedPoint.toUint(FixedPoint.mulQ128(entitlement, FixedPoint.toQ128x64(position.amount)));
-            SafeERC20.safeTransfer(IERC20(distributableERC20s[i]), msg.sender, reward);
+            SafeERC20.safeTransfer(IERC20(distributableERC20s[i]), staker, reward);
         }
         // Update the accumulator snapshots
         position.snapshotAccumulators = revenueAccumsPerStake;
-        stakes[msg.sender] = position;
+        stakes[staker] = position;
         
-        emit ClaimRevenue(msg.sender);
+        emit ClaimRevenue(staker);
     }
 
     /**
@@ -414,6 +455,8 @@ contract LiquidInfrastructureERC20 is
         for (uint i = 0; i < _distributableErc20s.length; i++) {
             revenueAccumsPerStake.push(FixedPoint.q128x64(0));
         }
+        nextWithdrawal = 0;
+
         emit Deployed();
     }
 }
