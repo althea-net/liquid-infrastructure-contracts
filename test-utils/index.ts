@@ -5,25 +5,41 @@ import { LiquidInfrastructureNFT } from "../typechain-types";
 import { ethers } from "hardhat";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { LiquidInfrastructureERC20 } from "../typechain-types";
+import { assert } from "ethers";
 
 export async function deployContracts(signer?: HardhatEthersSigner) {
-
-  const testERC20A = await ethers.deployContract("TestERC20A", signer) as unknown as TestERC20A;
+  const testERC20A = (await ethers.deployContract(
+    "TestERC20A",
+    signer
+  )) as unknown as TestERC20A;
   // const testERC20A = await TestERC20A.deploy() as TestERC20A;
 
-  const testERC20B = await ethers.deployContract("TestERC20A", signer) as unknown as TestERC20A;
+  const testERC20B = (await ethers.deployContract(
+    "TestERC20A",
+    signer
+  )) as unknown as TestERC20A;
 
-  const testERC20C = await ethers.deployContract("TestERC20A", signer) as unknown as TestERC20A;
+  const testERC20C = (await ethers.deployContract(
+    "TestERC20A",
+    signer
+  )) as unknown as TestERC20A;
 
   return { testERC20A, testERC20B, testERC20C };
 }
 
 export async function deployERC20A(signer: HardhatEthersSigner) {
-  return await ethers.deployContract("TestERC20A", signer) as unknown as TestERC20A;
+  return (await ethers.deployContract(
+    "TestERC20A",
+    signer
+  )) as unknown as TestERC20A;
 }
 
 export async function deployLiquidNFT(account: HardhatEthersSigner) {
-  return await ethers.deployContract("LiquidInfrastructureNFT", [account.address], account) as unknown as LiquidInfrastructureNFT;
+  return (await ethers.deployContract(
+    "LiquidInfrastructureNFT",
+    [account.address],
+    account
+  )) as unknown as LiquidInfrastructureNFT;
 }
 
 export async function deployLiquidERC20(
@@ -31,9 +47,13 @@ export async function deployLiquidERC20(
   erc20Name: string,
   erc20Symbol: string,
   approvedHolders: string[],
-  distributableErc20s: string[],
+  distributableErc20s: string[]
 ) {
-  return await ethers.deployContract("LiquidInfrastructureERC20", [erc20Name, erc20Symbol, approvedHolders, distributableErc20s], owner) as unknown as LiquidInfrastructureERC20;
+  return (await ethers.deployContract(
+    "LiquidInfrastructureERC20",
+    [erc20Name, erc20Symbol, approvedHolders, distributableErc20s],
+    owner
+  )) as unknown as LiquidInfrastructureERC20;
 }
 
 export function randi(max: number): number {
