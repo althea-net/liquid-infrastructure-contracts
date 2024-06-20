@@ -343,20 +343,24 @@ contract LiquidInfrastructureERC20 is
      * @param amount the amount of tokens to stake
      */
     function stake(uint256 amount) public nonReentrant {
-        require(balanceOf(msg.sender) >= amount, "insufficient balance");
-        require(allowance(msg.sender, address(this)) >= amount, "insufficient allowance");
-        SafeERC20.safeTransferFrom(IERC20(this), msg.sender, address(this), amount);
-        StakePosition storage position = stakes[msg.sender];
+        _stakeFor(msg.sender, amount);
+    }
+
+    function _stakeFor(address staker, uint256 amount) internal {
+        require(balanceOf(staker) >= amount, "insufficient balance");
+        require(allowance(staker, address(this)) >= amount, "insufficient allowance");
+        SafeERC20.safeTransferFrom(IERC20(this), staker, address(this), amount);
+        StakePosition storage position = stakes[staker];
         if (position.amount > 0) {
-            _claimRevenueFor(msg.sender);
+            _claimRevenueFor(staker);
         }
 
         position.amount += amount;
         totalStake += amount;
         position.snapshotAccumulators = revenueAccumsPerStake;
-        stakes[msg.sender] = position;
+        stakes[staker] = position;
 
-        emit Stake(msg.sender, amount);
+        emit Stake(staker, amount);
     }
 
     /**
@@ -402,6 +406,18 @@ contract LiquidInfrastructureERC20 is
     ) public onlyOwner nonReentrant {
         _mint(account, amount);
     }
+
+    /**
+     * @notice Mints new tokens to `account` and stakes them
+     */
+    function mintStaked(
+        address account,
+        uint256 amount
+    ) public onlyOwner nonReentrant {
+        _mint(account, amount);
+        _stakeFor(account, amount);
+    }
+
 
     ////////////////////////// Revenue Claiming //////////////////////////
 
