@@ -213,6 +213,11 @@ contract LiquidInfrastructureERC20 is
         revenueAccumsPerStake.push(FixedPoint.q128x64(0));
     }
 
+    /// @notice Returns the list of ERC20s which are distributed to holders
+    function getDistributableERC20s() public view returns (address[] memory) {
+        return distributableERC20s;
+    }
+
     /**
      * @notice Allows the owner to transfer ERC20s not on the distributableERC20s list to a recipient
      * This function is particularly useful for removing balances from the contract which were collected
@@ -421,15 +426,33 @@ contract LiquidInfrastructureERC20 is
             FixedPoint.q128x64 memory accum = revenueAccumsPerStake[i];
             // Calculate the entitlement per staked token (current accumulator - snapshot)
             FixedPoint.q128x64 memory entitlement = FixedPoint.subQ128(accum, position.snapshotAccumulators[i]);
-            // The actual reward is (staked amount) * (entitlement per stake)
-            uint256 reward = FixedPoint.toUint(FixedPoint.mulQ128(entitlement, FixedPoint.toQ128x64(position.amount)));
-            SafeERC20.safeTransfer(IERC20(distributableERC20s[i]), staker, reward);
+            // The actual revenue is (staked amount) * (entitlement per stake)
+            uint256 revenue = FixedPoint.toUint(FixedPoint.mulQ128(entitlement, FixedPoint.toQ128x64(position.amount)));
+            SafeERC20.safeTransfer(IERC20(distributableERC20s[i]), staker, revenue);
         }
         // Update the accumulator snapshots
         position.snapshotAccumulators = revenueAccumsPerStake;
         stakes[staker] = position;
         
         emit ClaimRevenue(staker);
+    }
+
+    /// @notice Allows anyone to estimate the revenue owed to a stakers' position
+    function estimateRevenueFor(address staker) public view returns (uint256[] memory) {
+        StakePosition storage position = stakes[staker];
+        uint256[] memory revenues = new uint256[](distributableERC20s.length);
+
+        for (uint i = 0; i < distributableERC20s.length; i++) {
+            // Get the current accumulator value for the relevant ERC20
+            FixedPoint.q128x64 memory accum = revenueAccumsPerStake[i];
+            // Calculate the entitlement per staked token (current accumulator - snapshot)
+            FixedPoint.q128x64 memory entitlement = FixedPoint.subQ128(accum, position.snapshotAccumulators[i]);
+            // The actual reward is (staked amount) * (entitlement per stake)
+            uint256 revenue = FixedPoint.toUint(FixedPoint.mulQ128(entitlement, FixedPoint.toQ128x64(position.amount)));
+            revenues[i] = revenue;
+        }
+
+        return revenues;
     }
 
     /**
