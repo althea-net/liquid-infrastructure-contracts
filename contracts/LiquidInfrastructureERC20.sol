@@ -348,7 +348,7 @@ contract LiquidInfrastructureERC20 is
         SafeERC20.safeTransferFrom(IERC20(this), msg.sender, address(this), amount);
         StakePosition storage position = stakes[msg.sender];
         if (position.amount > 0) {
-            claimRevenue();
+            _claimRevenueFor(msg.sender);
         }
 
         position.amount += amount;

@@ -833,6 +833,64 @@ describe("TestLiquidERC20", () => {
       }
     }
   }).timeout(1000 * 60 * 8); // Increase the timeout to 8 minutes
+
+  // A reentrancy bug was discovered where a holder staking multiple times would trigger a revert due to reentrancy
+  it("BigNumber Multi-stake Reentrancy", async () => {
+    let deployer = signers[0];
+    let numNFTs = randi(10) + 1;
+    let nfts = await deployLiquidNFTs(
+      deployer,
+      numNFTs,
+      erc20s,
+      erc20s.map((v) => 0)
+    );
+    await manageNFTs(deployer, token, nfts, true);
+
+    let revenuePerNFTByERC20 = erc20s.map((v) =>
+      BigNumber(1000000).times(oneEth)
+    );
+    await fundNFTs(
+      deployer,
+      nfts,
+      erc20s as TestERC20A[],
+      revenuePerNFTByERC20
+    );
+
+    let stakeByHolder = holderAddresses.map((v) =>
+      BigNumber(randi(1000000) + 1).times(oneEth)
+    );
+    await mintToHolders(deployer, token, holderAddresses, stakeByHolder);
+    await stakeFromHolders(signers, token);
+    await fundNFTs(
+      deployer,
+      nfts,
+      erc20s as TestERC20A[],
+      revenuePerNFTByERC20
+    );
+    await token.withdrawFromAllManagedNFTs();
+
+    await mintToHolders(deployer, token, holderAddresses, stakeByHolder);
+    await stakeFromHolders(signers, token);
+    await fundNFTs(
+      deployer,
+      nfts,
+      erc20s as TestERC20A[],
+      revenuePerNFTByERC20
+    );
+    await token.withdrawFromAllManagedNFTs();
+
+    await mintToHolders(deployer, token, holderAddresses, stakeByHolder);
+    await stakeFromHolders(signers, token);
+    await fundNFTs(
+      deployer,
+      nfts,
+      erc20s as TestERC20A[],
+      revenuePerNFTByERC20
+    );
+    await token.withdrawFromAllManagedNFTs();
+
+    await claimRevenue(signers, token);
+  }).timeout(1200000); // Increase the timeout to 80 seconds
 });
 
 export async function deployLiquidNFTs(
