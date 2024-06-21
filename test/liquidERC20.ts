@@ -627,6 +627,7 @@ describe("TestLiquidERC20", () => {
     }
     let unmanagedNFTs = nfts.slice(initialManagedNFTs, nfts.length);
     let unstakedHolders = holders.slice(initialStakers, holders.length);
+    let exStakers = [];
 
     let holderBalancesBefore: BigNumber[][] = new Array<BigNumber[]>(
       holders.length
@@ -650,8 +651,24 @@ describe("TestLiquidERC20", () => {
         if (action < 10) {
           // 10% chance of skipping an action
           continue;
+        } else if (action < 25 && exStakers.length > 0) {
+          // 15% chance of staking again from a previous staker
+          let exStaker = exStakers.pop() as HardhatEthersSigner;
+          let stake = BigNumber(
+            (await token.balanceOf(exStaker.address)).toString()
+          );
+          await stakeFromHolders([exStaker], token);
+          withdrawalData[w].stakers.push({ signer: exStaker, stake: stake });
+          withdrawalData[w].totalStake =
+            withdrawalData[w].totalStake.plus(stake);
+          console.log(
+            "Re-staked from staker " +
+              exStaker.address +
+              " with stake " +
+              stake.toFixed()
+          );
         } else if (action < 40 && unstakedHolders.length > 0) {
-          // 30% chance of adding a new staker
+          // 15% chance of adding a new staker
           let newStaker = unstakedHolders.pop() as HardhatEthersSigner;
           let stake = BigNumber(randi(1000000)).times(oneEth);
           await mintToHolders(deployer, token, [newStaker.address], [stake]);
@@ -678,6 +695,7 @@ describe("TestLiquidERC20", () => {
           unstaker.stake = BigNumber(0);
           withdrawalData[w].totalStake =
             withdrawalData[w].totalStake.minus(amount);
+          exStakers.push(unstaker.signer);
         } else {
           // 30% chance of claiming revenue
           let claimer =
