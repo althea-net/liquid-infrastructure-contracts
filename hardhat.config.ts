@@ -60,6 +60,7 @@ const config: HardhatUserConfig = {
         DAI_TEST4,
         DAI_TEST5,
       ],
+      timeout: 40000,
     },
     hardhat: {
       mining: {

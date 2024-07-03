@@ -14,10 +14,13 @@ import { AddressLike, BigNumberish } from "ethers";
 
 import { ethers } from "hardhat";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import { BigNumber } from "bignumber.js";
 
 const WxDAI_address = "0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d";
-const LiquidNFTExpectedAddress = "0x053591ab6156B09ba722Fbc9520Fb7B1C31dA273";
-const LiquidERC20ExpectedAddress = "0x0C885Ae5868E311A080789b620512Bd81e072F17";
+const LiquidNFTExpectedAddress = "0x59ae6Db6e90488D645Cf0796a79C3A47b6B56ef5";
+const LiquidERC20ExpectedAddress = "0x0000000000000000000000000000000000000000";
+
+const oneEth = BigNumber(1000000000000000000);
 
 async function deploy() {
   console.log("Enter deploy function");
@@ -48,38 +51,6 @@ async function deploy() {
     await sleep(1000);
   }
   console.log("Connected to network");
-
-  var liquid_nft_path: string;
-  var liquid_erc20_path: string;
-
-  const liquid_nft_main =
-    "/liquid/contracts/artifacts/contracts/LiquidInfrastructureNFT.sol/LiquidInfrastructureNFT.json";
-  const liquid_erc20_main =
-    "/liquid/contracts/artifacts/contracts/LiquidInfrastructureERC20.sol/LiquidInfrastructureERC20.json";
-
-  const liquid_nft_alt_1 =
-    "./artifacts/contracts/LiquidInfrastructureNFT.sol/LiquidInfrastructureNFT.json";
-  const liquid_erc20_alt_1 =
-    "./artifacts/contracts/LiquidInfrastructureERC20.sol/LiquidInfrastructureERC20.json";
-
-  const liquid_nft_alt_2 = "LiquidInfrastructureNFT.json";
-  const liquid_erc20_alt_2 = "LiquidInfrastructureERC20.json";
-
-  if (fs.existsSync(liquid_nft_main)) {
-    liquid_nft_path = liquid_nft_main;
-    liquid_erc20_path = liquid_erc20_main;
-  } else if (fs.existsSync(liquid_nft_alt_1)) {
-    liquid_nft_path = liquid_nft_alt_1;
-    liquid_erc20_path = liquid_erc20_alt_1;
-  } else if (fs.existsSync(liquid_nft_alt_2)) {
-    liquid_nft_path = liquid_nft_alt_2;
-    liquid_erc20_path = liquid_erc20_alt_2;
-  } else {
-    console.log(
-      "Test mode was enabled but the ERC20 contracts can't be found!"
-    );
-    exit(1);
-  }
 
   let deployed;
 
@@ -115,6 +86,7 @@ async function deploy() {
       "LiquidInfrastructureNFT deployed at Address - ",
       liquidNFTAddress
     );
+    sleep(30000);
   }
 
   let liquidERC20Address;
@@ -143,28 +115,51 @@ async function deploy() {
       "LiquidInfrastructureERC20 deployed at Address - ",
       liquidERC20Address
     );
+    sleep(30000);
   }
 
-  let erc20Factory = await ethers.getContractFactory("ERC20");
-  let WxDAI = erc20Factory.attach(WxDAI_address) as unknown as TestERC20B;
+  let WxDAI = (await ethers.getContractAt(
+    "TestERC20B",
+    WxDAI_address,
+    wallet
+  )) as unknown as TestERC20B;
 
-  // Generates multi-token activity
-  // await generateActivity(
-  //   wallet,
-  //   contractsDeployed,
-  //   [testERC20A, testERC20B, testERC20C],
-  //   liquidNFT,
-  //   liquidERC20
-  // );
+  let holderAddress = "0xF6ec240620aD5288028ad1F96D8725db0c838B90";
+  let holderAllocation = BigNumber(1000).times(oneEth);
 
-  // Generates single-token activity (testERC20A)
-  await generateActivity(
-    wallet,
-    contractsDeployed,
-    [WxDAI],
-    liquidNFT,
-    liquidERC20
-  );
+  let receipt;
+
+  if (!(await liquidERC20.isApprovedHolder(holderAddress))) {
+    console.log("Approving holder %s", holderAddress);
+    receipt = await (await liquidERC20.approveHolder(holderAddress)).wait();
+    console.assert(receipt?.blockNumber != null);
+  }
+
+  if (
+    !(
+      (await liquidERC20.balanceOf(holderAddress)) >=
+      BigInt(holderAllocation.toFixed())
+    )
+  ) {
+    console.log("Minting %s to holder %s", holderAllocation, holderAddress);
+    receipt = await (
+      await liquidERC20.mint(holderAddress, holderAllocation.toFixed())
+    ).wait();
+    console.assert(receipt?.blockNumber != null);
+  }
+
+  let nftOwnedByLToken =
+    (await liquidNFT.ownerOf(1)) == (await liquidERC20.getAddress());
+  if (!nftOwnedByLToken) {
+    console.log(
+      "NFT not owned by Liquid Infra token, setting up the NFT to be managed by the ERC20"
+    );
+    receipt = await (await liquidNFT.setThresholds([WxDAI], [0])).wait();
+    console.assert(receipt?.blockNumber != null);
+
+    // Transfer the NFT over to the ERC20
+    await transferNftToErc20AndManage(liquidERC20, liquidNFT, wallet);
+  }
 
   exit(0);
 }
@@ -179,7 +174,7 @@ async function generateActivity(
   deployed: boolean,
   erc20s: TestERC20B[],
   nft: LiquidInfrastructureNFT,
-  erc20: LiquidInfrastructureERC20
+  l_token: LiquidInfrastructureERC20
 ) {
   console.log("Generating activity...");
   // Connect erc20s to owner to prevent silly errors
@@ -189,22 +184,31 @@ async function generateActivity(
   let signers: HardhatEthersSigner[] = await ethers.getSigners();
   let holders = signers.slice(1, 6);
 
-  if (deployed) {
+  let nftOwnedByLToken = (await nft.ownerOf(1)) == (await l_token.getAddress());
+  if (!nftOwnedByLToken) {
     console.log(
-      "Contracts deployed, setting up the NFT to be managed by the ERC20"
+      "NFT not owned by Liquid Infra token, setting up the NFT to be managed by the ERC20"
     );
-    await nft.setThresholds(
-      erc20s,
-      erc20s.map(() => 0)
-    );
+    let receipt = await (
+      await nft.setThresholds(
+        erc20s,
+        erc20s.map(() => 0)
+      )
+    ).wait();
+    console.assert(receipt?.blockNumber != null);
+
+    await sleep(30000);
     // Transfer the NFT over to the ERC20
-    await transferNftToErc20AndManage(erc20, nft, owner);
+    await transferNftToErc20AndManage(l_token, nft, owner);
+    await sleep(30000);
   }
 
+  // Approve any unapproved holders
   for (let holder of holders) {
-    if (!(await erc20.isApprovedHolder(holder.address))) {
+    if (!(await l_token.isApprovedHolder(holder.address))) {
       console.log("Approving holder: ", holder.address);
-      await erc20.approveHolder(holder.address);
+      let receipt = await (await l_token.approveHolder(holder.address)).wait();
+      console.assert(receipt?.blockNumber != null);
     }
   }
 
@@ -213,72 +217,72 @@ async function generateActivity(
     console.log("Granting NFT some of the test erc20 tokens");
     let amount = Math.floor(Math.random() * 1000000) + 1000;
     let nft_address = await nft.getAddress();
-    await e.transfer(nft_address as AddressLike, amount as BigNumberish);
+    let receipt = await (await e.transfer(nft_address, amount)).wait();
+    console.assert(receipt?.blockNumber != null);
   }
 
-  if (deployed) {
-    console.log("Contracts deployed, approving holders for the erc20");
-    // Approve all the holders to hold the erc20
-    for (let holder of holders) {
-      await erc20.approveHolder(holder.address);
+  let holderAddresses = holders.map((h) => h.address);
+  let holderAmounts = holders.map((_, i) => i * 100 + 100);
+  let i = -1;
+  for (let holder of holderAddresses) {
+    i += 1;
+    let bal = await l_token.balanceOf(holder);
+    if (bal < holderAmounts[i]) {
+      console.log("Minting tokens for holder: ", holder);
+      let receipt = await (await l_token.mint(holder, holderAmounts[i])).wait();
+      console.assert(receipt?.blockNumber != null);
     }
-
-    let holderAddresses = holders.map((h) => h.address);
-    let holderAmounts = holders.map((_, i) => i * 100);
-    await transferERC20ToHolders(erc20, holderAddresses, holderAmounts);
   }
 
+  console.log("Staking from holders");
   for (let i = 0; i < holders.length; i++) {
     let holder = holders[i];
-    let t = erc20.connect(holder);
-    let balance = await t.balanceOf(holder.address);
-    await t.approve(await erc20.getAddress(), balance);
-    // let allowance = await t.allowance(holder.address, await erc20.getAddress());
-    await t.stake(balance);
-  }
-
-  console.log("Deploying a new NFT to manage with the ERC20");
-  // Deploy a new NFT, set its thresholds, and manage it under the ERC20
-  let newNFT = (await ethers.deployContract("LiquidInfrastructureNFT", [
-    owner.address,
-  ])) as unknown as LiquidInfrastructureNFT;
-  await newNFT.waitForDeployment();
-  console.log("New NFT deployed at Address - ", await newNFT.getAddress());
-  console.log("Waiting for chain settlement");
-  await sleep(10000);
-  console.log("Setting new NFT's thresholds");
-  await newNFT.setThresholds(
-    erc20s,
-    erc20s.map(() => 0)
-  );
-  console.log("Waiting for chain settlement");
-  await sleep(10000);
-  console.log("Transferring new NFT ownership to ERC20");
-  await transferNftToErc20AndManage(erc20, newNFT, owner);
-  console.log("Waiting for chain settlement");
-  await sleep(10000); // wait 10 seconds
-  // Grant newNFT it some tokens so they can be withdrawn by the ERC20
-  for (let erc20 of erc20s) {
-    console.log("Granting the new NFT some of the test erc20 tokens");
-    const amount = Math.floor(Math.random() * 400000) + 10000;
-
-    await erc20.transfer(await newNFT.getAddress(), amount);
+    let t = l_token.connect(holder);
+    let balance = await l_token.balanceOf(holder.address);
+    let pre_allowance = await t.allowance(holder.address, await t.getAddress());
+    if (pre_allowance < balance) {
+      let receipt = await (
+        await t.approve(await l_token.getAddress(), balance)
+      ).wait();
+      console.assert(receipt?.blockNumber != null);
+    }
+    let allowance = await t.allowance(
+      holder.address,
+      await l_token.getAddress()
+    );
+    console.log(
+      "Existing Allowance: %s, Balance: %s, Final Allowance",
+      pre_allowance,
+      balance,
+      allowance
+    );
+    if (allowance >= balance) {
+      console.log(
+        "Staking %s tokens from ",
+        balance.toString(),
+        holder.address
+      );
+      let receipt = await (await t.stake(balance.toString())).wait();
+      console.assert(receipt?.blockNumber != null);
+    }
   }
 
   console.log("Withdrawing...");
-  await erc20.withdrawFromAllManagedNFTs();
+  let receipt = await (await l_token.withdrawFromAllManagedNFTs()).wait();
+  console.assert(receipt?.blockNumber != null);
+
   console.log(
     "Withdrawal on or before block: ",
     await owner.provider.getBlockNumber()
   );
   console.log();
-  await sleep(10000); // wait 10 seconds
 
   console.log("Randomly claiming revenue from holders");
   for (let holder of holders) {
     if (Math.random() > 0.5) {
       console.log("Claiming revenue from holder: ", holder.address);
-      await erc20.connect(holder).claimRevenue();
+      let receipt = await (await l_token.connect(holder).claimRevenue()).wait();
+      console.assert(receipt?.blockNumber != null);
     }
   }
 }
@@ -290,10 +294,16 @@ async function transferNftToErc20AndManage(
 ) {
   const infraAddress = await erc20.getAddress();
   const accountId = await nft.AccountId();
-  await nft.transferFrom(owner, infraAddress, accountId);
-  await sleep(10000);
+  let receipt;
+  if (!((await nft.ownerOf(accountId)) == infraAddress)) {
+    receipt = await (
+      await nft.transferFrom(owner, infraAddress, accountId)
+    ).wait();
+    console.assert(receipt?.blockNumber != null);
+  }
   const nftAddress = await nft.getAddress();
-  await erc20.addManagedNFT(nftAddress);
+  receipt = await (await erc20.addManagedNFT(nftAddress)).wait();
+  console.assert(receipt?.blockNumber != null);
 }
 
 async function transferERC20sToReceiver(
