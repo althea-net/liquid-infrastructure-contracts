@@ -12,7 +12,6 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./LiquidInfrastructureNFT.sol";
 import "./libraries/FixedPoint.sol";
 
-/// TODO: Decide what happens when a holder is removed from the allowlist
 /// TODO: Reentrancy audit of all public functions
 /// TODO: NFT Transfer library?
 /// TODO: Audit all for loops, especially in the withdrawFromManagedNFTs function
@@ -46,7 +45,7 @@ contract LiquidInfrastructureERC20 is
     event ReleaseManagedNFT(address nft, address to);
     event Stake(address holder, uint256 amount);
     event ClaimRevenue(address holder);
-    event Unstake(address holder);
+    event Unstake(address holder, uint256 amount);
 
     /**
      * @notice This is the current version of the contract. Every update to the contract will introduce a new
@@ -85,14 +84,13 @@ contract LiquidInfrastructureERC20 is
     /**
      * @notice Marks `holder` as NOT approved to hold the token, preventing them from receiving any more of the underlying ERC20.
      * @param holder the account to add to the allowlist
-     * TODO: Determine if their balance should be unstaked + burned as well
      */
     function disapproveHolder(address holder) public onlyOwner {
         require(isApprovedHolder(holder), "holder not approved");
         HolderAllowlist[holder] = false;
-        if (getStake(holder) > 0) {
-            _claimRevenueFor(holder);
-            unstake();
+        uint256 position = getStake(holder);
+        if (position > 0) {
+            _unstakeFor(holder, position);
         }
     }
 
@@ -114,7 +112,7 @@ contract LiquidInfrastructureERC20 is
         bool stake_ = to == address(this);
         bool unstake_ = from == address(this);
         require(!(mint_ && burn_), "invalid mint/burn"); // Mint and burn are mutually exclusive
-        require(!((mint_ || burn_) && (stake_ || unstake_)), "invalid mint/burn"); // Mint/burn and stake/unstake are mutually exclusive
+        require(!((mint_ || burn_) && (stake_ || unstake_)), "mint/burn with stake/unstake"); // Mint/burn and stake/unstake are mutually exclusive
         require(!(stake_ && unstake_), "invalid stake/unstake"); // Stake and unstake are mutually exclusive
         if (mint_) {
             require(
@@ -131,7 +129,7 @@ contract LiquidInfrastructureERC20 is
         if (stake_) {
              require(
                 isApprovedHolder(from),
-                "unapproved burn"
+                "unapproved stake"
             );
         }
         // Unstaking must be allowed from even disapproved holders
@@ -142,6 +140,10 @@ contract LiquidInfrastructureERC20 is
     /// @notice This collection holds the managed LiquidInfrastructureNFTs which periodically generate revenue and deliver
     /// the balances to this contract.
     address[] public ManagedNFTs;
+
+    function getManagedNFTs() public view returns (address[] memory) {
+        return ManagedNFTs;
+    }
 
     /**
      * @notice Adds a LiquidInfrastructureNFT contract to the ManagedNFTs collection, transferring the NFT from msg.sender if necessary
@@ -348,8 +350,7 @@ contract LiquidInfrastructureERC20 is
 
     function _stakeFor(address staker, uint256 amount) internal {
         require(balanceOf(staker) >= amount, "insufficient balance");
-        require(allowance(staker, address(this)) >= amount, "insufficient allowance");
-        SafeERC20.safeTransferFrom(IERC20(this), staker, address(this), amount);
+        _transfer(staker, address(this), amount);
         StakePosition storage position = stakes[staker];
         if (position.amount > 0) {
             _claimRevenueFor(staker);
@@ -367,21 +368,26 @@ contract LiquidInfrastructureERC20 is
      * @notice Allows the caller to unstake their entire staking position from the contract
      * The caller's revenue will be claimed as part of this operation
      */
-    function unstake() public {
-        _unstakeFor(msg.sender);
+    function unstake(uint256 amount) public {
+        _unstakeFor(msg.sender, amount);
     }
 
-    function _unstakeFor(address staker) internal {
+    function _unstakeFor(address staker, uint256 amount) internal {
         StakePosition storage position = stakes[staker];
         require(position.amount > 0, "no position to unstake");
-        totalStake -= position.amount;
-        SafeERC20.safeTransfer(IERC20(this), staker, position.amount);
-        claimRevenue();
+        require(amount <= position.amount, "amount too large");
+        _claimRevenueFor(staker);
+        totalStake -= amount;
+        _transfer(address(this), staker, amount);
 
-        // Clear out the staking position
-        delete stakes[staker];
+        position.amount -= amount;
+        if (position.amount == 0) {
+            delete stakes[staker];
+        } else {
+            stakes[staker] = position;
+        }
 
-        emit Unstake(staker);
+        emit Unstake(staker, amount);
     }
 
     /** 
@@ -389,9 +395,9 @@ contract LiquidInfrastructureERC20 is
      * these "accumulator" values track LiquidInfrastructureNFT withdrawals and are used to calculate the reward
      * for each user based on their share of the total supply
      * 
-     * We store the total rewards accumulated per token divided by the total amount of stake at the point of withdrawal
+     * We store the total rewards accumulated per distributable ERC20 divided by the total amount of stake at the point of withdrawal
      * For a holder to earn rewards, they must first stake their token holding, whereby the current accumulator is 
-     * snapshotted for the holder. Later when they claim rewards or unstake, their rewards will be stake * (current accumulator - snapshot accumulator)
+     * snapshotted for the holder. Later when they claim rewards or unstake, their rewards will be [stake * (current accumulator - snapshot accumulator)]
      * The direct values here represents a staker who staked a single wei at contract genesis and has never unstaked, claimed revenue, or restaked other amounts
      * and would be entitled to the truncated value of the accumulator if they were to unstake, claim revenue, or restake right now
      */

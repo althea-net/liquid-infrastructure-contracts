@@ -81,7 +81,9 @@ describe("TestLiquidERC20", () => {
       "LiquidInfrastructureERC20"
     );
     holderAddresses = signers.map((v) => v.address);
-    let distributable = await erc20s.map(async (v) => await v.getAddress());
+    let distributable = await Promise.all(
+      erc20s.map(async (v) => await v.getAddress())
+    );
     let deployed = new ethers.Contract(
       DEPLOYED_CONTRACT,
       libFactory.interface,
@@ -108,10 +110,11 @@ describe("TestLiquidERC20", () => {
         holderAddresses,
         distributable
       )) as unknown as LiquidInfrastructureERC20;
+      console.log("Deployed ERC20 at ", await token.getAddress());
     }
   });
 
-  it("Simple Revenue Claim", async () => {
+  it("SSimple Revenue Claim", async () => {
     let deployer = signers[0];
     let numNFTs = randi(25) + 1;
     let nfts = await deployLiquidNFTs(
@@ -141,6 +144,13 @@ describe("TestLiquidERC20", () => {
     await token.withdrawFromAllManagedNFTs();
 
     await claimRevenue(signers, token);
+
+    await fundNFTs(
+      deployer,
+      nfts,
+      erc20s as TestERC20A[],
+      erc20s.map((v) => BigNumber(randi(10) + 1).times(oneEth))
+    );
   });
 
   it("Revenue Claim with Accounting", async () => {
@@ -917,6 +927,7 @@ export async function deployLiquidNFTs(
   thresholdERC20s: ERC20[],
   thresholdAmounts: number[]
 ): Promise<LiquidInfrastructureNFT[]> {
+  console.log("Deploying %d Liquid NFTs", num);
   let nfts: LiquidInfrastructureNFT[] = [];
   for (let i = 0; i < num; i++) {
     let nft = await deployLiquidNFT(deployer);
@@ -1003,7 +1014,7 @@ export async function unstakeFromHolders(
     let t = token.connect(unstakers[i]);
     let stake = await t.getStake(unstaker.address);
     expect(stake > 0).to.be.true;
-    await t.unstake();
+    await t.unstake(stake);
   }
 }
 export async function claimRevenue(
