@@ -13,9 +13,7 @@ import "./LiquidInfrastructureNFT.sol";
 import "./libraries/FixedPoint.sol";
 
 /// TODO: Reentrancy audit of all public functions
-/// TODO: NFT Transfer library?
 /// TODO: Audit all for loops, especially in the withdrawFromManagedNFTs function
-/// TODO: Add a mintStaked() onlyOwner which mints and stakes for the holder
 
 /**
  * @title Liquid Infrastructure ERC20
@@ -427,10 +425,20 @@ contract LiquidInfrastructureERC20 is
 
     ////////////////////////// Revenue Claiming //////////////////////////
 
+    /// @notice The address of the LiquidInfrastructureMulticlaim contract, which is allowed to call claimRevenueFor()
+    /// on behalf of stakers.
+    address public multiclaim;
+
     /// @notice Stakers may claim any accrued revenue for their staking position
     /// @dev revenue must be claimed when unstaking or increasing stake amount
     function claimRevenue() public nonReentrant {
         _claimRevenueFor(msg.sender);
+    }
+
+    /// @notice Stakers may use the multiclaim contract to claim revenue for multiple LiquidInfrastructureERC20 instances
+    function claimRevenueFor(address staker) public nonReentrant {
+        require(msg.sender == multiclaim, "invalid caller");
+        _claimRevenueFor(staker);
     }
 
     /// @dev Claims revenue for a staker
@@ -489,8 +497,11 @@ contract LiquidInfrastructureERC20 is
         string memory _name,
         string memory _symbol,
         address[] memory _approvedHolders,
-        address[] memory _distributableErc20s
+        address[] memory _distributableErc20s,
+        address _multiclaim
     ) ERC20(_name, _symbol) Ownable() {
+        multiclaim = _multiclaim;
+
         for (uint i = 0; i < _approvedHolders.length; i++) {
             HolderAllowlist[_approvedHolders[i]] = true;
         }
