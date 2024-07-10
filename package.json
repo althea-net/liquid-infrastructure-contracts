@@ -9,7 +9,7 @@
     "evm": "npx hardhat node"
   },
   "author": "Christian Borst",
-  "license": "ISC",
+  "license": "Apache-2.0",
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.2",
     "@nomicfoundation/hardhat-ethers": "^3.0.5",
