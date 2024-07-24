@@ -5,9 +5,11 @@ import mint from "./hardhat-tasks/mint";
 import deployERC20 from "./hardhat-tasks/deployERC20";
 import migrateERC20 from "./hardhat-tasks/migrateERC20";
 import { json } from "hardhat/internal/core/params/argumentTypes";
+import "@nomicfoundation/hardhat-verify";
 
 // The following are set using `npx hardhat vars set <KEY>` and then the value is a prompt for a secret.
 // I provide a default value so that the call does not fail for regular hardhat network usage
+const GNOSISSCAN_API_KEY = vars.get("GNOSISSCAN_API_KEY", "");
 const DAI_PRIVATE_KEY = vars.get(
   "DAI_PRIVATE_KEY",
   "0xc5e8f61d1ab959b397eecc0a37a6517b8e67a0e7cf1f4bce5591f3ed80199122" // hardhat signer 0 to avoid failure
@@ -964,6 +966,21 @@ const config: HardhatUserConfig = {
         },
       ],
     },
+  },
+  etherscan: {
+    apiKey: {
+      dai: GNOSISSCAN_API_KEY,
+    },
+    customChains: [
+      {
+        network: "dai",
+        chainId: 100,
+        urls: {
+          apiURL: "https://api.gnosisscan.io/api",
+          browserURL: "https://gnosisscan.io/",
+        },
+      },
+    ],
   },
 };
 
