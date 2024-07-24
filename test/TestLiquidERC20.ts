@@ -108,7 +108,8 @@ describe("TestLiquidERC20", () => {
         "Infra",
         "INFRA",
         holderAddresses,
-        distributable
+        distributable,
+        ZERO_ADDRESS // No multiclaim
       )) as unknown as LiquidInfrastructureERC20;
       console.log("Deployed ERC20 at ", await token.getAddress());
     }
