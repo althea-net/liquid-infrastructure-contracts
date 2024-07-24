@@ -1,6 +1,7 @@
-import { HardhatUserConfig, vars } from "hardhat/config";
-import "@nomicfoundation/hardhat-toolbox";
+import { HardhatUserConfig, task, vars } from "hardhat/config";
+require("@nomicfoundation/hardhat-toolbox");
 import "@nomicfoundation/hardhat-ethers";
+import mint from "./hardhat-tasks/mint";
 
 // The following are set using `npx hardhat vars set <KEY>` and then the value is a prompt for a secret.
 // I provide a default value so that the call does not fail for regular hardhat network usage
@@ -28,6 +29,14 @@ const DAI_TEST5 = vars.get(
   "DAI_TEST5",
   "0x275cc4a2bfd4f612625204a20a2280ab53a6da2d14860c47a9f5affe58ad86d4" // hardhat signer 5 to avoid failure
 );
+
+task("mint", "Mint tokens")
+  .addParam("receiver", "Receiver address")
+  .addParam("amount", "Amount to mint")
+  .addParam("erc20", "ERC20 address")
+  .setAction(async (args, hre) => {
+    await mint(args.receiver, args.amount, args.erc20, hre);
+  });
 
 const config: HardhatUserConfig = {
   solidity: {

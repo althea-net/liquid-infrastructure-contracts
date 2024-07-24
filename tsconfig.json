@@ -17,7 +17,7 @@
     "./src",
     "./test",
     "./scripts"
-  ],
+, "hardhat-tasks/mint.ts"  ],
   "files": [
     "./hardhat.config.ts"
   ]
