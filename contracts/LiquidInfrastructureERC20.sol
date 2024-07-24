@@ -44,12 +44,17 @@ contract LiquidInfrastructureERC20 is
     event Stake(address holder, uint256 amount);
     event ClaimRevenue(address holder);
     event Unstake(address holder, uint256 amount);
+    event Approved(address holder);
+    event Disapproved(address holder);
+    event DistributableERC20Added(address erc20);
+    event NondistributableTransfer(address erc20, uint256 amount, address receiver);
+    event SetManagedNFTThresholds(address nft, address[] newErc20s, uint256[] newAmounts);
 
     /**
      * @notice This is the current version of the contract. Every update to the contract will introduce a new
      * version, regardless of anticipated compatibility.
      */
-    uint256 public constant Version = 2;
+    uint256 public constant Version = 3;
 
 
     ////////////////////////// Allow List //////////////////////////
@@ -77,6 +82,7 @@ contract LiquidInfrastructureERC20 is
     function approveHolder(address holder) public onlyOwner {
         require(!isApprovedHolder(holder), "holder already approved");
         HolderAllowlist[holder] = true;
+        emit Approved(holder);
     }
 
     /**
@@ -90,6 +96,7 @@ contract LiquidInfrastructureERC20 is
         if (position > 0) {
             _unstakeFor(holder, position);
         }
+        emit Disapproved(holder);
     }
 
     /**
@@ -211,6 +218,7 @@ contract LiquidInfrastructureERC20 is
         distributableERC20s.push(address(newERC20));
         _ssDistributableHoldings.push(0);
         revenueAccumsPerStake.push(FixedPoint.q128x64(0));
+        emit DistributableERC20Added(address(newERC20));
     }
 
     /// @notice Returns the list of ERC20s which are distributed to holders
@@ -232,7 +240,9 @@ contract LiquidInfrastructureERC20 is
         for (uint i = 0; i < distributableERC20s.length; i++) {
             require(distributableERC20s[i] != token, "token is distributable");
         }
-        IERC20(token).transfer(recipient, IERC20(token).balanceOf(address(this)));
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        IERC20(token).transfer(recipient, balance);
+        emit NondistributableTransfer(token, balance, recipient);
     }
 
     /// @notice Withdraws revenue from all of the managed NFTs. This call may cause gas errors, in which case
@@ -316,6 +326,7 @@ contract LiquidInfrastructureERC20 is
         for (uint i = 0; i < ManagedNFTs.length; i++) {
             if (ManagedNFTs[i] == nft) {
                 LiquidInfrastructureNFT(nft).setThresholds(newErc20s, newAmounts);
+                emit SetManagedNFTThresholds(nft, newErc20s, newAmounts);
                 return;
             }
         }
