@@ -12,9 +12,6 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./LiquidInfrastructureNFT.sol";
 import "./libraries/FixedPoint.sol";
 
-/// TODO: Reentrancy audit of all public functions
-/// TODO: Audit all for loops, especially in the withdrawFromManagedNFTs function
-
 /**
  * @title Liquid Infrastructure ERC20
  * @author Christian Borst <christian@althea.systems>
