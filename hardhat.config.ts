@@ -159,7 +159,7 @@ const config: HardhatUserConfig = {
   },
   networks: {
     dai: {
-      url: "https://rpc.gnosischain.com",
+      url: "https://dai.althea.net",
       accounts: [
         DAI_PRIVATE_KEY,
         DAI_TEST1,
