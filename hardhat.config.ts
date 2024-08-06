@@ -2,6 +2,9 @@ import { HardhatUserConfig, task, vars } from "hardhat/config";
 require("@nomicfoundation/hardhat-toolbox");
 import "@nomicfoundation/hardhat-ethers";
 import mint from "./hardhat-tasks/mint";
+import deployERC20 from "./hardhat-tasks/deployERC20";
+import migrateERC20 from "./hardhat-tasks/migrateERC20";
+import { json } from "hardhat/internal/core/params/argumentTypes";
 
 // The following are set using `npx hardhat vars set <KEY>` and then the value is a prompt for a secret.
 // I provide a default value so that the call does not fail for regular hardhat network usage
@@ -38,6 +41,102 @@ task("mint", "Mint tokens")
     await mint(args.receiver, args.amount, args.erc20, hre);
   });
 
+task("deployERC20", "Deploy a LiquidInfrastructureERC20 token")
+  .addParam("name", "Token Name")
+  .addParam("symbol", "Token Symbol")
+  .addParam("approvedHolders", "Initial Approved Holders")
+  .addParam("distributableErc20s", "Initial Distrubutable ERC20s")
+  .addParam(
+    "multiclaimAddress",
+    "The address of the Liquid Infrastructure Multiclaim contract"
+  )
+  .setAction(async (args, hre) => {
+    await deployERC20(
+      hre,
+      args.name,
+      args.symbol,
+      args.approvedHolders,
+      args.distributableErc20s,
+      args.multiclaimAddress
+    );
+  });
+
+task(
+  "migrateERC20",
+  "Migrate a LiquidInfrastructureERC20 token to a new contract"
+)
+  .addParam(
+    "oldErc20Address",
+    "The address of the LiquidInfrastructureERC20 to migrate"
+  )
+  .addParam(
+    "newErc20Address",
+    "(optional) The new LiquidInfrastructureERC20 target",
+    undefined,
+    undefined,
+    true
+  )
+  .addParam(
+    "newName",
+    "(optional) Argument for the new LiquidInfrastructureERC20 constructor",
+    undefined,
+    undefined,
+    true
+  )
+  .addParam(
+    "newSymbol",
+    "(optional) Argument for the new LiquidInfrastructureERC20 constructor",
+    undefined,
+    undefined,
+    true
+  )
+  .addParam(
+    "multiclaimAddress",
+    "(optional) Argument for the new LiquidInfrastructureERC20 constructor",
+    undefined,
+    undefined,
+    true
+  )
+  .addParam(
+    "approvedHolders",
+    "The approved holders to migrate over",
+    undefined,
+    json
+  )
+  .addParam(
+    "migrateStake",
+    "Whether the old contract's stake positions should be migrated"
+  )
+  .addParam(
+    "migrateBalances",
+    "Whether the old contract's unstaked token balances should be migrated"
+  )
+  .addParam(
+    "distributableErc20s",
+    "The set of distributableERC20s which must be on the new contract",
+    undefined,
+    json
+  )
+  .addParam(
+    "nftsToTransfer",
+    "The set of nfts to migrate to the new contract",
+    undefined,
+    json
+  )
+  .setAction(async (args, hre) => {
+    await migrateERC20(hre, {
+      oldERC20Address: args.oldErc20Address,
+      newERC20Address: args.newErc20Address,
+      approvedHolders: args.approvedHolders,
+      distributableERC20s: args.distributableErc20s,
+      migrateBalances: args.migrateBalances,
+      migrateStake: args.migrateStake,
+      nftsToTransfer: args.nftsToTransfer,
+      newName: args.newName,
+      newSymbol: args.newSymbol,
+      multiclaimAddress: args.multiclaimAddress,
+    });
+  });
 const config: HardhatUserConfig = {
   solidity: {
     compilers: [
