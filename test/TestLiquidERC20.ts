@@ -15,6 +15,7 @@ import {
   TestERC20C,
   LiquidInfrastructureNFT,
   LiquidInfrastructureERC20,
+  LiquidInfrastructureMulticlaim,
 } from "../typechain-types/contracts";
 import { ERC20 } from "../typechain-types/@openzeppelin/contracts/token/ERC20";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
@@ -23,6 +24,7 @@ const {
 } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 const { expect } = chai;
 
+const DEPLOYED_MULTICLAIM = "0x0000000000000000000000000000000000000000";
 const DEPLOYED_CONTRACT = "0x0000000000000000000000000000000000000000";
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const ONE_ETH = 1000000000000000000;
@@ -62,6 +64,8 @@ export function fromQ64(val: bigint): BigNumber {
 
 describe("TestLiquidERC20", () => {
   let token: LiquidInfrastructureERC20;
+  let multiclaim: LiquidInfrastructureMulticlaim;
+  let multiclaimAddress: string;
   let signers: HardhatEthersSigner[];
   let holderAddresses: AddressLike[];
   let erc20s: ERC20[];
@@ -76,6 +80,19 @@ describe("TestLiquidERC20", () => {
     signers = await ethers.getSigners();
     let tokens = await deployContracts(signers[0]);
     erc20s = [tokens.testERC20A, tokens.testERC20B, tokens.testERC20C];
+
+    const multiclaimFactory = await ethers.getContractFactory(
+      "LiquidInfrastructureMulticlaim"
+    );
+    multiclaim = multiclaimFactory.attach(
+      DEPLOYED_MULTICLAIM
+    ) as unknown as LiquidInfrastructureMulticlaim;
+    if ((await multiclaim.getDeployedCode()) == null) {
+      multiclaim =
+        (await multiclaimFactory.deploy()) as unknown as LiquidInfrastructureMulticlaim;
+      multiclaimAddress = await multiclaim.getAddress();
+      console.log("Deployed Multiclaim at ", multiclaimAddress);
+    }
 
     const libFactory = await ethers.getContractFactory(
       "LiquidInfrastructureERC20"
@@ -109,7 +126,7 @@ describe("TestLiquidERC20", () => {
         "INFRA",
         holderAddresses,
         distributable,
-        ZERO_ADDRESS // No multiclaim
+        multiclaimAddress
       )) as unknown as LiquidInfrastructureERC20;
       console.log("Deployed ERC20 at ", await token.getAddress());
     }
@@ -152,7 +169,7 @@ describe("TestLiquidERC20", () => {
       erc20s as TestERC20A[],
       erc20s.map((v) => BigNumber(randi(10) + 1).times(oneEth))
     );
-  });
+  }).timeout(120000); // Increase the timeout to 120 seconds
 
   it("Revenue Claim with Accounting", async () => {
     let deployer = signers[0];

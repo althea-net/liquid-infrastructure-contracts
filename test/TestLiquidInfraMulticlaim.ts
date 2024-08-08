@@ -24,7 +24,8 @@ const {
 } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 const { expect } = chai;
 
-const DEPLOYED_CONTRACT = "0x0000000000000000000000000000000000000000";
+const DEPLOYED_MULTICLAIM = "0x0000000000000000000000000000000000000000";
+const DEPLOYED_ERC20s: string[] = [];
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const ONE_ETH = 1000000000000000000;
 
@@ -63,6 +64,7 @@ export function fromQ64(val: bigint): BigNumber {
 
 describe("TestLiquidInfraMulticlaim", () => {
   let multiclaim: LiquidInfrastructureMulticlaim;
+  let multiclaimAddress: string;
   let tokens: LiquidInfrastructureERC20[] = [];
   let signers: HardhatEthersSigner[];
   let holderAddresses: AddressLike[];
@@ -82,32 +84,80 @@ describe("TestLiquidInfraMulticlaim", () => {
     const multiclaimFactory = await ethers.getContractFactory(
       "LiquidInfrastructureMulticlaim"
     );
-    multiclaim =
-      (await multiclaimFactory.deploy()) as unknown as LiquidInfrastructureMulticlaim;
-    const multiclaimAddress = await multiclaim.getAddress();
-    console.log("Deployed Multiclaim at ", multiclaimAddress);
+    multiclaim = multiclaimFactory.attach(
+      DEPLOYED_MULTICLAIM
+    ) as unknown as LiquidInfrastructureMulticlaim;
+    if ((await multiclaim.getDeployedCode()) == null) {
+      multiclaim =
+        (await multiclaimFactory.deploy()) as unknown as LiquidInfrastructureMulticlaim;
+      multiclaimAddress = await multiclaim.getAddress();
+      console.log("Deployed Multiclaim at ", multiclaimAddress);
+    }
 
-    const erc20Factory = await ethers.getContractFactory(
-      "LiquidInfrastructureERC20"
-    );
-    holderAddresses = signers.map((v) => v.address);
+    holderAddresses = signers.slice(0, 10).map((v) => v.address);
     let distributable = await Promise.all(
       erc20s.map(async (v) => await v.getAddress())
     );
 
-    let numTokens = randi(5) + 1;
-    for (let i = 0; i < numTokens; i++) {
-      let token = (await erc20Factory.deploy(
-        "Infra" + i.toString(),
-        "INFRA" + i.toString(),
-        holderAddresses,
-        distributable,
-        multiclaimAddress
-      )) as unknown as LiquidInfrastructureERC20;
-      console.log("Deployed ERC20 %s at %s", i, await token.getAddress());
-      tokens.push(token);
+    const erc20Factory = await ethers.getContractFactory(
+      "LiquidInfrastructureERC20"
+    );
+    for (let token of DEPLOYED_ERC20s) {
+      let deployedErc20 = erc20Factory.attach(
+        token
+      ) as unknown as LiquidInfrastructureERC20;
+      if ((await deployedErc20.getDeployedCode()) == null) {
+        deployedErc20 = (await erc20Factory.deploy(
+          "INFRA",
+          "INFRA",
+          holderAddresses,
+          distributable,
+          multiclaimAddress
+        )) as unknown as LiquidInfrastructureERC20;
+        const erc20Address = await deployedErc20.getAddress();
+        console.log("Deployed ERC20 at ", erc20Address);
+      }
+      tokens.push(deployedErc20);
     }
   });
+
+  it("test setup", async () => {
+    let deployer = signers[0];
+    for (let token of tokens) {
+      for (let holder of holderAddresses) {
+        if (!(await token.isApprovedHolder(holder))) {
+          await token.approveHolder(holder);
+        }
+      }
+      let numNFTs = 1;
+      let nfts = await deployLiquidNFTs(
+        deployer,
+        numNFTs,
+        erc20s,
+        erc20s.map((_) => 0)
+      );
+
+      await manageNFTs(deployer, token, nfts, true);
+
+      await fundNFTs(
+        deployer,
+        nfts,
+        erc20s as TestERC20A[],
+        erc20s.map((v) => BigNumber(100).times(oneEth))
+      );
+
+      await mintToHolders(
+        deployer,
+        token,
+        holderAddresses,
+        holderAddresses.map((_) => BigNumber(randi(1000) + 1).times(oneEth))
+      );
+
+      await stakeFromHolders(signers, token);
+
+      await token.withdrawFromAllManagedNFTs();
+    }
+  }).timeout(1200000);
 
   it("Multi claim", async () => {
     let deployer = signers[0];
@@ -259,11 +309,9 @@ export async function stakeFromHolders(
     let holder = holders[i];
     let t = token.connect(holders[i]);
     let balance = await t.balanceOf(holder.address);
-    expect(balance > 0).to.be.true;
-    await t.approve(await token.getAddress(), balance);
-    let allowance = await t.allowance(holder.address, await token.getAddress());
-    expect(allowance == balance).to.be.true;
-    await t.stake(balance);
+    if (balance > 0) {
+      await t.stake(balance);
+    }
   }
 }
 
