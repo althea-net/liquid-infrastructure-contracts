@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.19; // Force solidity compliance
+pragma solidity 0.8.28; // Force solidity compliance
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./LiquidInfrastructureNFT.sol";
 import "./libraries/FixedPoint.sol";
 
@@ -99,10 +99,10 @@ contract LiquidInfrastructureERC20 is
     /**
      * @dev Restricts certain token transfers, in particular all holders must be approved 
      */
-    function _beforeTokenTransfer(
+    function _update(
         address from,
         address to,
-        uint256
+        uint256 amount
     ) internal virtual override {
         // Staking is allowed by only the approved holders
         // Unstaking must be allowed by even disapproved holders, may not unstake to this address or the zero address
@@ -135,6 +135,9 @@ contract LiquidInfrastructureERC20 is
             );
         }
         // Unstaking must be allowed from even disapproved holders
+
+        // Transfer the tokens
+        super._update(from, to, amount);
     }
 
     ////////////////////////// NFT Management and Revenue Withdrawals //////////////////////////
@@ -480,11 +483,25 @@ contract LiquidInfrastructureERC20 is
         StakePosition storage position = stakes[staker];
         uint256[] memory revenues = new uint256[](distributableERC20s.length);
 
+        // Much like _claimRevenueFor() this position may have been created before a new distributableERC20 was added,
+        // in which case we need to pad the snapshotAccumulators with 0s for those new ERC20s. To do so we
+        // create a local copy of the snapshotAccumulators which has the expected length
+        FixedPoint.q128x64[] memory snapshots = new FixedPoint.q128x64[](distributableERC20s.length);
+
+        // Now we copy existing values, leaving 0's for any new ERC20s
+        for (uint i = 0; i < distributableERC20s.length; i++) {
+            if (i < position.snapshotAccumulators.length) {
+                snapshots[i] = position.snapshotAccumulators[i];
+            }
+            // Otherwise, the snapshot value remains 0
+        }
+
+        // Estimate the revenue by calculating entitlement * amount for each ERC20
         for (uint i = 0; i < distributableERC20s.length; i++) {
             // Get the current accumulator value for the relevant ERC20
             FixedPoint.q128x64 memory accum = revenueAccumsPerStake[i];
             // Calculate the entitlement per staked token (current accumulator - snapshot)
-            FixedPoint.q128x64 memory entitlement = FixedPoint.subQ128(accum, position.snapshotAccumulators[i]);
+            FixedPoint.q128x64 memory entitlement = FixedPoint.subQ128(accum, snapshots[i]);
             // The actual reward is (staked amount) * (entitlement per stake)
             uint256 revenue = FixedPoint.toUint(FixedPoint.mulQ128(entitlement, FixedPoint.toQ128x64(position.amount)));
             revenues[i] = revenue;
@@ -504,10 +521,11 @@ contract LiquidInfrastructureERC20 is
     constructor(
         string memory _name,
         string memory _symbol,
+        address initialOwner,
         address[] memory _approvedHolders,
         address[] memory _distributableErc20s,
         address _multiclaim
-    ) ERC20(_name, _symbol) Ownable() {
+    ) ERC20(_name, _symbol) Ownable(initialOwner == address(0) ? msg.sender : initialOwner) {
         multiclaim = _multiclaim;
 
         for (uint i = 0; i < _approvedHolders.length; i++) {

@@ -1,5 +1,6 @@
 import { HardhatUserConfig, task, vars } from "hardhat/config";
 require("@nomicfoundation/hardhat-toolbox");
+require("@nomicfoundation/hardhat-chai-matchers");
 import "@nomicfoundation/hardhat-ethers";
 import mint from "./hardhat-tasks/mint";
 import deployERC20 from "./hardhat-tasks/deployERC20";
@@ -143,7 +144,7 @@ const config: HardhatUserConfig = {
   solidity: {
     compilers: [
       {
-        version: "0.8.19",
+        version: "0.8.28",
         settings: {
           optimizer: {
             enabled: true,

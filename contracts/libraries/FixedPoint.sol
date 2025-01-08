@@ -1,7 +1,7 @@
 // This library is derived from the ambient FixedPoint library, with some minor changes for clarity and safety
 
 // SPDX-License-Identifier: GPL-3
-pragma solidity 0.8.19;
+pragma solidity 0.8.28;
 
 import "hardhat/console.sol";
 

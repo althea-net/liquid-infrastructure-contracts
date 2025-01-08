@@ -1,4 +1,3 @@
-import chai from "chai";
 
 import { mine } from "@nomicfoundation/hardhat-network-helpers";
 import { ethers } from "hardhat";
@@ -22,7 +21,7 @@ import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 const {
   loadFixture,
 } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
-const { expect } = chai;
+const { expect } = require("chai");
 
 const DEPLOYED_MULTICLAIM = "0x0000000000000000000000000000000000000000";
 const DEPLOYED_ERC20s: string[] = [];
@@ -38,6 +37,8 @@ const ONE_ETH = 1000000000000000000;
 
 import { AddressLike, assert, BigNumberish } from "ethers";
 import { BigNumber } from "bignumber.js";
+import {zeroAddress} from "viem";
+import {token} from "../typechain-types/factories/@openzeppelin/contracts";
 
 const PRECISION = 100000000;
 const PRECISION_BN = BigNumber(PRECISION);
@@ -66,7 +67,9 @@ describe("TestLiquidInfraMulticlaim", () => {
   let multiclaim: LiquidInfrastructureMulticlaim;
   let multiclaimAddress: string;
   let tokens: LiquidInfrastructureERC20[] = [];
+  let tokenAddressess: AddressLike[] = [];
   let signers: HardhatEthersSigner[];
+  let holders: HardhatEthersSigner[] = [];
   let holderAddresses: AddressLike[];
   let erc20s: ERC20[];
   let acceptableError = 0.001; // 0.1% error
@@ -94,7 +97,8 @@ describe("TestLiquidInfraMulticlaim", () => {
       console.log("Deployed Multiclaim at ", multiclaimAddress);
     }
 
-    holderAddresses = signers.slice(0, 10).map((v) => v.address);
+    holders = signers.slice(0, 10);
+    holderAddresses = holders.map((v) => v.address);
     let distributable = await Promise.all(
       erc20s.map(async (v) => await v.getAddress())
     );
@@ -102,26 +106,40 @@ describe("TestLiquidInfraMulticlaim", () => {
     const erc20Factory = await ethers.getContractFactory(
       "LiquidInfrastructureERC20"
     );
-    for (let token of DEPLOYED_ERC20s) {
-      let deployedErc20 = erc20Factory.attach(
-        token
-      ) as unknown as LiquidInfrastructureERC20;
-      if ((await deployedErc20.getDeployedCode()) == null) {
-        deployedErc20 = (await erc20Factory.deploy(
+    if (DEPLOYED_ERC20s.length == 0) {
+      let deployedErc20 = (await erc20Factory.deploy(
           "INFRA",
           "INFRA",
+          zeroAddress,
           holderAddresses,
           distributable,
           multiclaimAddress
         )) as unknown as LiquidInfrastructureERC20;
         const erc20Address = await deployedErc20.getAddress();
         console.log("Deployed ERC20 at ", erc20Address);
+        tokens.push(deployedErc20);
+        tokenAddressess.push(erc20Address);
+    } else {
+      for (let token of DEPLOYED_ERC20s) {
+        let deployedErc20 = erc20Factory.attach(
+          token
+        ) as unknown as LiquidInfrastructureERC20;
+        if ((await deployedErc20.getDeployedCode()) == null) {
+          deployedErc20 = (await erc20Factory.deploy(
+            "INFRA",
+            "INFRA",
+            zeroAddress,
+            holderAddresses,
+            distributable,
+            multiclaimAddress
+          )) as unknown as LiquidInfrastructureERC20;
+          const erc20Address = await deployedErc20.getAddress();
+          console.log("Deployed ERC20 at ", erc20Address);
+        }
+        tokens.push(deployedErc20);
+        tokenAddressess.push(await deployedErc20.getAddress());
       }
-      tokens.push(deployedErc20);
     }
-  });
-
-  it("test setup", async () => {
     let deployer = signers[0];
     for (let token of tokens) {
       for (let holder of holderAddresses) {
@@ -157,49 +175,18 @@ describe("TestLiquidInfraMulticlaim", () => {
 
       await token.withdrawFromAllManagedNFTs();
     }
-  }).timeout(1200000);
+  });
 
   it("Multi claim", async () => {
-    let deployer = signers[0];
-    for (let token of tokens) {
-      let numNFTs = randi(5) + 1;
-      let nfts = await deployLiquidNFTs(
-        deployer,
-        numNFTs,
-        erc20s,
-        erc20s.map((_) => 0)
-      );
-
-      await manageNFTs(deployer, token, nfts, true);
-
-      await fundNFTs(
-        deployer,
-        nfts,
-        erc20s as TestERC20A[],
-        erc20s.map((v) => BigNumber(10).times(oneEth))
-      );
-
-      await mintToHolders(
-        deployer,
-        token,
-        holderAddresses,
-        holderAddresses.map((v) => randi(1000000) + 1)
-      );
-
-      await stakeFromHolders(signers, token);
-
-      await token.withdrawFromAllManagedNFTs();
-    }
-
     // Perform a claim revenue for each signer on all the tokens
-    for (let signer of signers) {
-      let balances = await Promise.all(erc20s.map((v) => v.balanceOf(signer)));
+    for (let holder of holders) {
+      let balances = await Promise.all(erc20s.map((v) => v.balanceOf(holder)));
       let totalBalances = balances.reduce(
         (a, b) => a.plus(b.toString()),
         BigNumber(0)
       );
       let estimations = await Promise.all(
-        tokens.map((v) => v.estimateRevenueFor(signer))
+        tokens.map((v) => v.estimateRevenueFor(holder))
       );
       let totalEstimation = estimations.reduce(
         (a, b) =>
@@ -207,12 +194,15 @@ describe("TestLiquidInfraMulticlaim", () => {
         BigNumber(0)
       );
       let addresses = await Promise.all(tokens.map((v) => v.getAddress()));
-      let claim = multiclaim.connect(signer);
-      expect(await claim.claimRevenueMulti(addresses)).to.not.be.reverted;
+      let claim = multiclaim.connect(holder);
+      let firstToken = tokens[0];
+      let firstTokenAddr = await firstToken.getAddress();
+
+      expect(await claim.claimRevenueMulti(addresses)).to.emit(firstTokenAddr, "ClaimRevenue").withArgs(holder.address);
 
       for (let i = 0; i < tokens.length; i++) {
         let token = tokens[i];
-        let remaining = await token.estimateRevenueFor(signer);
+        let remaining = await token.estimateRevenueFor(holder);
         let totalRemaining = remaining.reduce(
           (a, b) => a.plus(b.toString()),
           BigNumber(0)
@@ -220,12 +210,13 @@ describe("TestLiquidInfraMulticlaim", () => {
         expect(totalRemaining.eq(0)).to.be.true;
       }
       let postBalances = await Promise.all(
-        erc20s.map((v) => v.balanceOf(signer))
+        erc20s.map((v) => v.balanceOf(holder))
       );
       let totalPostBalances = postBalances.reduce(
         (a, b) => a.plus(b.toString()),
         BigNumber(0)
       );
+
       expect(totalPostBalances.gt(totalBalances)).to.be.true;
       expect(totalPostBalances.minus(totalBalances).eq(totalEstimation)).to.be
         .true;

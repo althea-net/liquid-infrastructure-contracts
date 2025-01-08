@@ -1,6 +1,3 @@
-import chai from "chai";
-import { ethers } from "hardhat";
-
 import { deployContracts, deployLiquidNFT } from "../test-utils";
 import { ContractTransactionResponse } from "ethers";
 import {
@@ -11,7 +8,7 @@ import {
 } from "../typechain-types";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 
-const { expect } = chai;
+const { expect } = require("chai");
 
 // This test makes assertions about the LiquidInfrastructureNFT contract by running it on hardhat, this contract
 // is part of a hybrid Cosmos implementation, so it is not possible to test the interactions with the x/microtx

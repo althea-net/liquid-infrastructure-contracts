@@ -38,6 +38,7 @@ const ONE_ETH = 1000000000000000000;
 
 import { AddressLike, assert, BigNumberish } from "ethers";
 import { BigNumber } from "bignumber.js";
+import {zeroAddress} from "viem";
 
 const PRECISION = 100000000;
 const PRECISION_BN = BigNumber(PRECISION);
@@ -124,6 +125,7 @@ describe("TestLiquidERC20", () => {
       token = (await libFactory.deploy(
         "Infra",
         "INFRA",
+        zeroAddress,
         holderAddresses,
         distributable,
         multiclaimAddress
