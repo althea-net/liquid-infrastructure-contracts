@@ -1,4 +1,3 @@
-//SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.28; // Force solidity compliance
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
