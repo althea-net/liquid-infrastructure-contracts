@@ -7,6 +7,7 @@ import deployERC20 from "./hardhat-tasks/deployERC20";
 import migrateERC20 from "./hardhat-tasks/migrateERC20";
 import { json } from "hardhat/internal/core/params/argumentTypes";
 import "@nomicfoundation/hardhat-verify";
+import { whitelistHolder } from "./hardhat-tasks/whitelistHolder";
 
 // The following are set using `npx hardhat vars set <KEY>` and then the value is a prompt for a secret.
 // I provide a default value so that the call does not fail for regular hardhat network usage
@@ -62,6 +63,12 @@ task("deployERC20", "Deploy a LiquidInfrastructureERC20 token")
       args.distributableErc20s,
       args.multiclaimAddress
     );
+  });
+task("whitelistHolder", "Approves a holder for a LiquidERC20 token")
+  .addPositionalParam("contract")
+  .addPositionalParam("toApprove")
+  .setAction(async (taskArgs, hre) => {
+    await whitelistHolder(hre, taskArgs["contract"], taskArgs["toApprove"]);
   });
 
 task(
